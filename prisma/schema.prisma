@@ -1,0 +1,862 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model Student {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sStudentId          String    @map("s_student_id") @db.VarChar(32)
+  sFirstName          String    @map("s_first_name") @db.VarChar(120)
+  sLastName           String    @map("s_last_name") @db.VarChar(200)
+  sFullName           String    @map("s_full_name") @db.VarChar(320)
+  sBirthDate          DateTime  @map("s_birth_date") @db.Date
+  sBirthPlace         String?   @map("s_birth_place") @db.VarChar(255)
+  sGender             String?   @map("s_gender") @db.VarChar(32)
+  sClassRoleId        Int       @default(0) @map("s_class_role_id") @db.SmallInt
+  sPermanentResidence String?   @map("s_permanent_residence")
+  sIsInClass          Boolean   @default(true) @map("s_is_in_class")
+  sClassStudentId     String?   @map("s_class_student_id") @db.VarChar(64)
+  sStudyProgramId     String?   @map("s_study_program_id") @db.VarChar(64)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt           DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([sIsInClass, sClassRoleId, sGender, updatedAt(sort: Desc)], map: "students_filters_idx")
+  @@map("students")
+}
+
+model AuditLog {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId      String?  @map("actor_id") @db.VarChar(128)
+  action       String   @db.VarChar(64)
+  resourceType String   @map("resource_type") @db.VarChar(64)
+  resourceId   String?  @map("resource_id") @db.Uuid
+  requestId    String?  @map("request_id") @db.VarChar(128)
+  details      Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([resourceType, resourceId, createdAt(sort: Desc)], map: "audit_logs_resource_idx")
+  @@map("audit_logs")
+}
+
+model Class {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  classId   String    @unique(map: "classes_s_class_student_id_key") @map("class_id") @db.VarChar(64)
+  className String    @map("class_name") @db.VarChar(320)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  cohortId  String?   @map("cohort_id") @db.Uuid
+  isActive  Boolean   @default(true) @map("is_active")
+
+  @@map("classes")
+}
+
+model Cohort {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sCohortCode String    @unique @map("s_cohort_code") @db.VarChar(64)
+  sCohortName String    @map("s_cohort_name") @db.VarChar(320)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  isActive    Boolean   @default(true) @map("is_active")
+
+  @@map("cohorts")
+}
+
+model TrainingProgram {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sProgramCode   String    @unique @map("s_program_code") @db.VarChar(64)
+  sProgramName   String    @map("s_program_name") @db.VarChar(320)
+  sDegreeLevel   String    @map("s_degree_level") @db.VarChar(128)
+  sMajor         String    @map("s_major") @db.VarChar(255)
+  sStudyType     String    @map("s_study_type") @db.VarChar(128)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+  s_faculty_code String?   @db.VarChar(64)
+  isActive       Boolean   @default(true) @map("is_active")
+  status         String    @default("active") @db.VarChar(16)
+
+  @@map("training_programs")
+}
+
+model Course {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sCourseCode String    @unique @map("s_course_code") @db.VarChar(64)
+  sCourseName String    @map("s_course_name") @db.VarChar(320)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@map("courses")
+}
+
+model TrainingProgramCourse {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  trainingProgramId String   @map("training_program_id") @db.Uuid
+  courseId          String   @map("course_id") @db.Uuid
+  sSemesterNo       Int      @map("s_semester_no") @db.SmallInt
+  sCredits          Int      @map("s_credits") @db.SmallInt
+  sTheoryHours      Int?     @map("s_theory_hours") @db.SmallInt
+  sPracticeHours    Int?     @map("s_practice_hours") @db.SmallInt
+  sRequirementType  String   @map("s_requirement_type") @db.VarChar(32)
+  sNote             String?  @map("s_note")
+  sYearStudy        String?  @map("s_year_study") @db.VarChar(32)
+  sTermId           String?  @map("s_term_id") @db.VarChar(32)
+  sDepartmentCode   String?  @map("s_department_code") @db.VarChar(64)
+  sFacultyCode      String?  @map("s_faculty_code") @db.VarChar(64)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  academicTermId    String?  @map("academic_term_id") @db.Uuid
+
+  @@unique([trainingProgramId, courseId])
+  @@index([trainingProgramId, sSemesterNo], map: "training_program_courses_semester_idx")
+  @@index([academicTermId], map: "training_program_courses_term_idx")
+  @@map("training_program_courses")
+}
+
+model AcademicYear {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sYearCode String    @unique @map("s_year_code") @db.VarChar(9)
+  startDate DateTime? @map("start_date") @db.Date
+  endDate   DateTime? @map("end_date") @db.Date
+  status    String    @default("draft") @db.VarChar(16)
+  isCurrent Boolean   @default(false) @map("is_current")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@map("academic_years")
+}
+
+model AcademicTerm {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  academicYearId String    @map("academic_year_id") @db.Uuid
+  sTermCode      String    @map("s_term_code") @db.VarChar(8)
+  sTermName      String    @map("s_term_name") @db.VarChar(64)
+  sTermOrder     Int       @map("s_term_order") @db.SmallInt
+  sIsSummer      Boolean   @default(false) @map("s_is_summer")
+  startDate      DateTime? @map("start_date") @db.Date
+  endDate        DateTime? @map("end_date") @db.Date
+  status         String    @default("draft") @db.VarChar(16)
+  isCurrent      Boolean   @default(false) @map("is_current")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@unique([academicYearId, sTermCode])
+  @@unique([academicYearId, sTermOrder])
+  @@unique([id, academicYearId], map: "academic_terms_id_year_key")
+  @@map("academic_terms")
+}
+
+model GradeImportBatch {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sourceHash     String    @map("source_hash") @db.VarChar(64)
+  status         String    @db.VarChar(16)
+  totalRows      Int       @default(0) @map("total_rows")
+  importedRows   Int       @default(0) @map("imported_rows")
+  errorMessage   String?   @map("error_message")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz(6)
+  idempotencyKey String?   @map("idempotency_key") @db.VarChar(128)
+
+  @@map("grade_import_batches")
+}
+
+model UnscopedGradeRecord {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId          String   @map("student_id") @db.Uuid
+  sStudentId         String   @map("s_student_id") @db.VarChar(32)
+  sCourseCode        String?  @map("s_course_code") @db.VarChar(64)
+  sCourseName        String?  @map("s_course_name") @db.VarChar(320)
+  sCredits           Int?     @map("s_credits") @db.SmallInt
+  reason             String   @db.VarChar(128)
+  sourcePayload      Json     @default("{}") @map("source_payload")
+  sourceMd5          String?  @map("source_md5") @db.VarChar(64)
+  gradeImportBatchId String?  @map("grade_import_batch_id") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([studentId], map: "unscoped_grade_records_student_idx")
+  @@index([gradeImportBatchId], map: "unscoped_grade_records_batch_idx")
+  @@map("unscoped_grade_records")
+}
+
+model StudentCourseOffering {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId            String   @map("student_id") @db.Uuid
+  academicYearId       String   @map("academic_year_id") @db.Uuid
+  academicTermId       String   @map("academic_term_id") @db.Uuid
+  courseId             String   @map("course_id") @db.Uuid
+  sStudentId           String   @map("s_student_id") @db.VarChar(32)
+  sProgramCode         String?  @map("s_program_code") @db.VarChar(64)
+  sCurriculumId        String   @map("s_curriculum_id") @db.VarChar(64)
+  sStudyUnitId         String   @map("s_study_unit_id") @db.VarChar(64)
+  sScheduleStudyUnitId String   @default("") @map("s_schedule_study_unit_id") @db.VarChar(128)
+  sCourseName          String   @map("s_course_name") @db.VarChar(320)
+  sCourseNameEng       String?  @map("s_course_name_eng") @db.VarChar(320)
+  sCourseGroup         String?  @map("s_course_group") @db.VarChar(32)
+  sCredits             Int      @map("s_credits") @db.SmallInt
+  sourcePayload        Json     @default("{}") @map("source_payload")
+  sourceMd5            String?  @map("source_md5") @db.VarChar(64)
+  gradeImportBatchId   String?  @map("grade_import_batch_id") @db.Uuid
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([studentId, academicTermId, sStudyUnitId, sScheduleStudyUnitId])
+  @@index([sCurriculumId, academicYearId, academicTermId], map: "student_course_offerings_course_idx")
+  @@index([studentId, academicTermId], map: "student_course_offerings_student_term_idx")
+  @@map("student_course_offerings")
+}
+
+model StudentCourseGrade {
+  offeringId             String   @id @map("offering_id") @db.Uuid
+  score10                Decimal? @map("score_10") @db.Decimal(4, 2)
+  score4                 Decimal? @map("score_4") @db.Decimal(3, 2)
+  letterCode             String?  @map("letter_code") @db.VarChar(8)
+  specialCode            String?  @map("special_code") @db.VarChar(16)
+  isPass                 Boolean  @default(false) @map("is_pass")
+  isGather               Boolean  @default(false) @map("is_gather")
+  notScore               Boolean  @default(false) @map("not_score")
+  notComputeAverageScore Boolean  @default(false) @map("not_compute_average_score")
+  note                   String?
+  scoreStatus            String   @map("score_status") @db.VarChar(16)
+  sourcePayload          Json     @default("{}") @map("source_payload")
+  sourceMd5              String?  @map("source_md5") @db.VarChar(64)
+  gradeImportBatchId     String?  @map("grade_import_batch_id") @db.Uuid
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("student_course_grades")
+}
+
+model StudentTermSummary {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId          String   @map("student_id") @db.Uuid
+  academicTermId     String   @map("academic_term_id") @db.Uuid
+  creditsEarned      Decimal? @map("credits_earned") @db.Decimal(8, 2)
+  registeredCredits  Decimal  @default(0) @map("registered_credits") @db.Decimal(8, 2)
+  gpa10              Decimal? @map("gpa_10") @db.Decimal(4, 2)
+  gpa4               Decimal? @map("gpa_4") @db.Decimal(3, 2)
+  cumulativeCredits  Decimal? @map("cumulative_credits") @db.Decimal(8, 2)
+  cumulativeGpa10    Decimal? @map("cumulative_gpa_10") @db.Decimal(4, 2)
+  cumulativeGpa4     Decimal? @map("cumulative_gpa_4") @db.Decimal(3, 2)
+  conductScore       Decimal? @map("conduct_score") @db.Decimal(5, 2)
+  classificationName String?  @map("classification_name") @db.VarChar(64)
+  sourcePayload      Json     @default("{}") @map("source_payload")
+  gradeImportBatchId String?  @map("grade_import_batch_id") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  sProgramCode       String   @map("s_program_code") @db.VarChar(64)
+
+  @@unique([studentId, sProgramCode, academicTermId], map: "student_term_summaries_student_program_term_key")
+  @@map("student_term_summaries")
+}
+
+model StudentConductRecord {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId           String   @map("student_id") @db.Uuid
+  academicYearId      String   @map("academic_year_id") @db.Uuid
+  academicTermId      String   @map("academic_term_id") @db.Uuid
+  sStudentId          String   @map("s_student_id") @db.VarChar(32)
+  sClassStudentId     String?  @map("s_class_student_id") @db.VarChar(64)
+  orders              Int?     @db.SmallInt
+  studentScore        Decimal? @map("student_score") @db.Decimal(5, 2)
+  classScore          Decimal? @map("class_score") @db.Decimal(5, 2)
+  departmentScore     Decimal? @map("department_score") @db.Decimal(5, 2)
+  statusId            String?  @map("status_id") @db.VarChar(32)
+  lastScore           Decimal? @map("last_score") @db.Decimal(5, 2)
+  sourceUpdateDay     String?  @map("source_update_day") @db.VarChar(64)
+  sourceUpdateStaff   String?  @map("source_update_staff") @db.VarChar(128)
+  sourcePayload       Json     @default("{}") @map("source_payload")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([studentId, academicTermId], map: "student_conduct_records_student_term_key")
+  @@index([academicYearId, academicTermId, sClassStudentId], map: "student_conduct_records_period_class_idx")
+  @@map("student_conduct_records")
+}
+
+model StudentCumulativeSummary {
+  id                          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId                   String   @map("student_id") @db.Uuid
+  sProgramCode                String   @default("") @map("s_program_code") @db.VarChar(64)
+  gradeImportBatchId          String?  @map("grade_import_batch_id") @db.Uuid
+  createdAt                   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  cumulativeCredits           Decimal? @map("cumulative_credits") @db.Decimal(8, 2)
+  cumulativeGpa10             Decimal? @map("cumulative_gpa_10") @db.Decimal(4, 2)
+  cumulativeGpa4              Decimal? @map("cumulative_gpa_4") @db.Decimal(3, 2)
+  sourceTermSummaryId         String   @map("source_term_summary_id") @db.Uuid
+  sourceAcademicYearId        String   @map("source_academic_year_id") @db.Uuid
+  sourceAcademicTermId        String   @map("source_academic_term_id") @db.Uuid
+  refreshedAt                 DateTime @default(now()) @map("refreshed_at") @db.Timestamptz(6)
+  cumulativeRegisteredCredits Decimal  @default(0) @map("cumulative_registered_credits") @db.Decimal(8, 2)
+
+  @@unique([studentId, sProgramCode])
+  @@index([sourceAcademicYearId, sourceAcademicTermId], map: "student_cumulative_summaries_source_term_idx")
+  @@map("student_cumulative_summaries")
+}
+
+model GradeImportError {
+  id                 String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  gradeImportBatchId String  @map("grade_import_batch_id") @db.Uuid
+  rowNumber          Int     @map("row_number")
+  studentId          String? @map("student_id") @db.VarChar(32)
+  message            String
+  payload            Json    @default("{}")
+
+  @@map("grade_import_errors")
+}
+
+model DecisionType {
+  decisionTypeId Int       @id @map("decision_type_id")
+  decisionName   String    @map("decision_name") @db.VarChar(320)
+  category       String    @default("other") @db.VarChar(16)
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@map("decision_types")
+}
+
+model StudentDecision {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId         String    @map("student_id") @db.Uuid
+  academicYearId    String    @map("academic_year_id") @db.Uuid
+  academicTermId    String    @map("academic_term_id") @db.Uuid
+  decisionTypeId    Int       @map("decision_type_id")
+  sStudentId        String    @map("s_student_id") @db.VarChar(32)
+  sYearStudy        String    @map("s_year_study") @db.VarChar(9)
+  sTermId           String    @map("s_term_id") @db.VarChar(8)
+  sDecisionNumber   String    @map("s_decision_number") @db.VarChar(255)
+  sDecisionAlias    String    @default("") @map("s_decision_alias") @db.VarChar(255)
+  sSignStaff        String    @default("") @map("s_sign_staff") @db.VarChar(320)
+  sSignDate         DateTime? @map("s_sign_date") @db.Date
+  sDecisionName     String    @default("") @map("s_decision_name") @db.VarChar(320)
+  sReason           String    @default("") @map("s_reason")
+  sFullText         String    @default("") @map("s_full_text")
+  sUpdateStaff      String?   @map("s_update_staff") @db.VarChar(128)
+  sUpdateDate       DateTime? @map("s_update_date") @db.Date
+  sourcePayload     Json      @default("{}") @map("source_payload")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz(6)
+  isAcademicWarning Boolean   @default(false) @map("is_academic_warning")
+
+  @@map("student_decisions")
+}
+
+model FeePolicyType {
+  feeObjectDicId   String    @id @map("fee_object_dic_id") @db.VarChar(64)
+  feeObjectDicName String    @map("fee_object_dic_name") @db.VarChar(320)
+  isActive         Boolean   @default(true) @map("is_active")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@map("fee_policy_types")
+}
+
+model StudentFeePolicy {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId          String    @map("student_id") @db.Uuid
+  academicYearId     String    @map("academic_year_id") @db.Uuid
+  academicTermId     String    @map("academic_term_id") @db.Uuid
+  feeObjectDicId     String    @map("fee_object_dic_id") @db.VarChar(64)
+  sStudentId         String    @map("s_student_id") @db.VarChar(32)
+  sFeeObjectId       BigInt    @map("s_fee_object_id")
+  sYearStudy         String    @map("s_year_study") @db.VarChar(9)
+  sTermId            String    @map("s_term_id") @db.VarChar(8)
+  sFeeObjectDicName  String    @map("s_fee_object_dic_name") @db.VarChar(320)
+  sCoefficient       String    @map("s_coefficient") @db.VarChar(64)
+  coefficientPercent Decimal   @map("coefficient_percent") @db.Decimal(5, 2)
+  sDecisionNumber    String    @map("s_decision_number") @db.VarChar(255)
+  sourcePayload      Json      @default("{}") @map("source_payload")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@map("student_fee_policies")
+}
+
+model User {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username     String    @unique @db.VarChar(128)
+  email        String?   @unique @db.VarChar(320)
+  passwordHash String    @map("password_hash")
+  fullName     String    @map("full_name") @db.VarChar(320)
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@map("users")
+}
+
+model Role {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code      String    @unique @db.VarChar(64)
+  name      String    @db.VarChar(160)
+  dataScope String    @map("data_scope") @db.VarChar(32)
+  isSystem  Boolean   @default(false) @map("is_system")
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@map("roles")
+}
+
+model Permission {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code         String   @unique @db.VarChar(128)
+  name         String   @db.VarChar(160)
+  resource     String   @db.VarChar(64)
+  action       String   @db.VarChar(32)
+  isAssignable Boolean  @default(true) @map("is_assignable")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("permissions")
+}
+
+model UserRole {
+  userId    String   @map("user_id") @db.Uuid
+  roleId    String   @map("role_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       String   @map("role_id") @db.Uuid
+  permissionId String   @map("permission_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model LecturerProfile {
+  userId      String   @id @map("user_id") @db.Uuid
+  staffCode   String   @unique @map("staff_code") @db.VarChar(64)
+  facultyCode String?  @map("faculty_code") @db.VarChar(64)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("lecturer_profiles")
+}
+
+model ClassAdvisorAssignment {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  classId        String    @map("class_id") @db.Uuid
+  academicTermId String    @map("academic_term_id") @db.Uuid
+  status         String    @default("active") @db.VarChar(16)
+  assignedAt     DateTime  @default(now()) @map("assigned_at") @db.Timestamptz(6)
+  assignedById   String?   @map("assigned_by") @db.Uuid
+  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokedById    String?   @map("revoked_by") @db.Uuid
+
+  @@unique([userId, academicTermId])
+  @@unique([classId, academicTermId])
+  @@map("class_advisor_assignments")
+}
+
+model RefreshToken {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash") @db.VarChar(128)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  replacedBy String?   @map("replaced_by") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, expiresAt], map: "refresh_tokens_user_idx")
+  @@map("refresh_tokens")
+}
+
+model TrainingProgressPlan {
+  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cohortId                String   @map("cohort_id") @db.Uuid
+  trainingProgramId       String   @map("training_program_id") @db.Uuid
+  academicYearId          String   @map("academic_year_id") @db.Uuid
+  academicTermId          String   @map("academic_term_id") @db.Uuid
+  curriculumSemesterNo    Int      @map("curriculum_semester_no") @db.SmallInt
+  version                 Int
+  status                  String   @default("draft") @db.VarChar(16)
+  isCurrent               Boolean  @default(false) @map("is_current")
+  requiredElectiveCredits Int      @default(0) @map("required_elective_credits")
+  createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  cloneBatchId            String?  @map("clone_batch_id") @db.Uuid
+  clonedFromPlanId        String?  @map("cloned_from_plan_id") @db.Uuid
+  clonedFromProgramId     String?  @map("cloned_from_program_id") @db.Uuid
+  is_program_final        Boolean  @default(false)
+
+  @@unique([cohortId, trainingProgramId, academicTermId, version])
+  @@index([cohortId, trainingProgramId, academicTermId, version(sort: Desc)], map: "training_progress_plans_scope_idx")
+  @@map("training_progress_plans")
+}
+
+model TrainingProgressPlanCourse {
+  id                     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  planId                 String   @map("plan_id") @db.Uuid
+  courseId               String   @map("course_id") @db.Uuid
+  sCourseCode            String   @map("s_course_code") @db.VarChar(64)
+  sCourseName            String   @map("s_course_name") @db.VarChar(320)
+  sCredits               Int      @map("s_credits") @db.SmallInt
+  requirementType        String   @map("requirement_type") @db.VarChar(16)
+  isRegistrationRequired Boolean  @default(false) @map("is_registration_required")
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  choiceGroupCode        String?  @map("choice_group_code") @db.VarChar(64)
+
+  @@unique([planId, courseId])
+  @@index([planId, requirementType, courseId], map: "training_progress_plan_courses_plan_idx")
+  @@map("training_progress_plan_courses")
+}
+
+model TrainingProgressCalculationRun {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  planId               String    @map("plan_id") @db.Uuid
+  planVersion          Int       @map("plan_version")
+  status               String    @db.VarChar(16)
+  totalStudents        Int       @default(0) @map("total_students")
+  passStudents         Int       @default(0) @map("pass_students")
+  failStudents         Int       @default(0) @map("fail_students")
+  dataErrorStudents    Int       @default(0) @map("data_error_students")
+  errorMessage         String?   @map("error_message")
+  startedAt            DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt          DateTime? @map("completed_at") @db.Timestamptz(6)
+  sourceSnapshot       Json      @default("[]") @map("source_snapshot")
+  sourceSnapshotHash   String?   @map("source_snapshot_hash") @db.VarChar(64)
+  sourceCapturedAt     DateTime? @map("source_captured_at") @db.Timestamptz(6)
+  sourceOldestSyncedAt DateTime? @map("source_oldest_synced_at") @db.Timestamptz(6)
+  sourceLatestSyncedAt DateTime? @map("source_latest_synced_at") @db.Timestamptz(6)
+  offeringCount        Int       @default(0) @map("offering_count")
+
+  @@index([planId, startedAt(sort: Desc)], map: "training_progress_runs_plan_idx")
+  @@index([sourceCapturedAt(sort: Desc)], map: "training_progress_runs_source_captured_idx")
+  @@map("training_progress_calculation_runs")
+}
+
+model TrainingProgressStudentResult {
+  id                                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId                             String   @map("run_id") @db.Uuid
+  studentId                         String   @map("student_id") @db.Uuid
+  classId                           String?  @map("class_id") @db.Uuid
+  cohortId                          String?  @map("cohort_id") @db.Uuid
+  sStudentId                        String   @map("s_student_id") @db.VarChar(32)
+  sStudentName                      String   @map("s_student_name") @db.VarChar(320)
+  sClassStudentId                   String?  @map("s_class_student_id") @db.VarChar(64)
+  sClassName                        String?  @map("s_class_name") @db.VarChar(320)
+  sProgramCode                      String?  @map("s_program_code") @db.VarChar(64)
+  mandatoryRequiredCourses          Int      @default(0) @map("mandatory_required_courses")
+  mandatoryRegisteredCourses        Int      @default(0) @map("mandatory_registered_courses")
+  mandatoryRequiredCredits          Int      @default(0) @map("mandatory_required_credits")
+  mandatoryRegisteredCredits        Int      @default(0) @map("mandatory_registered_credits")
+  missingMandatoryCourses           Int      @default(0) @map("missing_mandatory_courses")
+  requiredElectiveCourses           Int      @default(0) @map("required_elective_courses")
+  registeredRequiredElectiveCourses Int      @default(0) @map("registered_required_elective_courses")
+  missingRequiredElectiveCourses    Int      @default(0) @map("missing_required_elective_courses")
+  requiredElectiveCredits           Int      @default(0) @map("required_elective_credits")
+  registeredElectiveCredits         Int      @default(0) @map("registered_elective_credits")
+  missingCredits                    Int      @default(0) @map("missing_credits")
+  outsidePlanCourses                Int      @default(0) @map("outside_plan_courses")
+  outsidePlanCredits                Int      @default(0) @map("outside_plan_credits")
+  status                            String   @db.VarChar(16)
+  calculatedAt                      DateTime @default(now()) @map("calculated_at") @db.Timestamptz(6)
+  choiceGroupResults                Json     @default("[]") @map("choice_group_results")
+
+  @@unique([runId, studentId])
+  @@index([runId, classId, sStudentId], map: "training_progress_student_results_run_class_idx")
+  @@index([runId, status, sStudentId], map: "training_progress_student_results_run_status_idx")
+  @@map("training_progress_student_results")
+}
+
+model TrainingProgressCourseResult {
+  id                     String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentResultId        String  @map("student_result_id") @db.Uuid
+  courseId               String? @map("course_id") @db.Uuid
+  sCourseCode            String  @map("s_course_code") @db.VarChar(64)
+  sCourseName            String  @map("s_course_name") @db.VarChar(320)
+  sCredits               Int     @map("s_credits") @db.SmallInt
+  resultGroup            String  @map("result_group") @db.VarChar(16)
+  isRegistrationRequired Boolean @default(false) @map("is_registration_required")
+  registrationStatus     String  @map("registration_status") @db.VarChar(16)
+  choiceGroupCode        String? @map("choice_group_code") @db.VarChar(64)
+
+  @@unique([studentResultId, sCourseCode, resultGroup], map: "training_progress_course_resu_student_result_id_s_course_co_key")
+  @@index([studentResultId, resultGroup, registrationStatus], map: "training_progress_course_results_student_idx")
+  @@map("training_progress_course_results")
+}
+
+model TrainingProgressGroupResult {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId               String   @map("run_id") @db.Uuid
+  groupType           String   @map("group_type") @db.VarChar(16)
+  groupId             String   @map("group_id") @db.Uuid
+  groupCode           String   @map("group_code") @db.VarChar(64)
+  groupName           String?  @map("group_name") @db.VarChar(320)
+  totalStudents       Int      @default(0) @map("total_students")
+  passStudents        Int      @default(0) @map("pass_students")
+  failStudents        Int      @default(0) @map("fail_students")
+  dataErrorStudents   Int      @default(0) @map("data_error_students")
+  totalMissingCredits Int      @default(0) @map("total_missing_credits")
+  calculatedAt        DateTime @default(now()) @map("calculated_at") @db.Timestamptz(6)
+
+  @@unique([runId, groupType, groupId])
+  @@index([runId, groupType, groupCode], map: "training_progress_group_results_run_idx")
+  @@map("training_progress_group_results")
+}
+
+model TrainingProgressCompletionRun {
+  id                       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cohortId                 String    @map("cohort_id") @db.Uuid
+  trainingProgramId        String    @map("training_program_id") @db.Uuid
+  assessmentAcademicTermId String    @map("assessment_academic_term_id") @db.Uuid
+  sourceSnapshot           Json      @default("{}") @map("source_snapshot")
+  sourceSnapshotHash       String?   @map("source_snapshot_hash") @db.VarChar(64)
+  sourceCapturedAt         DateTime  @default(now()) @map("source_captured_at") @db.Timestamptz(6)
+  status                   String    @db.VarChar(16)
+  totalStudents            Int       @default(0) @map("total_students")
+  completedStudents        Int       @default(0) @map("completed_students")
+  incompleteStudents       Int       @default(0) @map("incomplete_students")
+  cannotDetermineStudents  Int       @default(0) @map("cannot_determine_students")
+  onTrackStudents          Int       @default(0) @map("on_track_students")
+  behindScheduleStudents   Int       @default(0) @map("behind_schedule_students")
+  noDuePlanStudents        Int       @default(0) @map("no_due_plan_students")
+  dataErrorStudents        Int       @default(0) @map("data_error_students")
+  errorMessage             String?   @map("error_message")
+  startedAt                DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt              DateTime? @map("completed_at") @db.Timestamptz(6)
+  publicationStatus        String    @default("archived") @map("publication_status") @db.VarChar(16)
+  pendingResultStudents    Int       @default(0) @map("pending_result_students")
+  evaluationMode           String    @default("standard") @map("evaluation_mode") @db.VarChar(32)
+  evaluation_scope         String    @default("program_completion") @db.VarChar(32)
+
+  @@index([cohortId, trainingProgramId, assessmentAcademicTermId, startedAt(sort: Desc)], map: "training_progress_completion_runs_scope_idx")
+  @@map("training_progress_completion_runs")
+}
+
+model TrainingProgressCompletionStudentResult {
+  id                             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId                          String   @map("run_id") @db.Uuid
+  studentId                      String   @map("student_id") @db.Uuid
+  classId                        String?  @map("class_id") @db.Uuid
+  cohortId                       String?  @map("cohort_id") @db.Uuid
+  sStudentId                     String   @map("s_student_id") @db.VarChar(32)
+  sStudentName                   String   @map("s_student_name") @db.VarChar(320)
+  sClassStudentId                String?  @map("s_class_student_id") @db.VarChar(64)
+  sClassName                     String?  @map("s_class_name") @db.VarChar(320)
+  sProgramCode                   String?  @map("s_program_code") @db.VarChar(64)
+  duePlansTotal                  Int      @default(0) @map("due_plans_total")
+  duePlansPassed                 Int      @default(0) @map("due_plans_passed")
+  duePlansFailed                 Int      @default(0) @map("due_plans_failed")
+  allPlansTotal                  Int      @default(0) @map("all_plans_total")
+  allPlansPassed                 Int      @default(0) @map("all_plans_passed")
+  allPlansFailed                 Int      @default(0) @map("all_plans_failed")
+  missingMandatoryCourses        Int      @default(0) @map("missing_mandatory_courses")
+  missingRequiredElectiveCourses Int      @default(0) @map("missing_required_elective_courses")
+  missingElectiveCredits         Int      @default(0) @map("missing_elective_credits")
+  scheduleStatus                 String   @map("schedule_status") @db.VarChar(24)
+  programCompletionStatus        String   @map("program_completion_status") @db.VarChar(24)
+  dataErrorReason                String?  @map("data_error_reason")
+  calculatedAt                   DateTime @default(now()) @map("calculated_at") @db.Timestamptz(6)
+  cumulativeGpa10                Decimal? @map("cumulative_gpa_10") @db.Decimal(4, 2)
+  cumulativeGpa4                 Decimal? @map("cumulative_gpa_4") @db.Decimal(3, 2)
+  gpaAcademicYear                String?  @map("gpa_academic_year") @db.VarChar(16)
+  gpaTermCode                    String?  @map("gpa_term_code") @db.VarChar(16)
+  pendingResultCourses           Int      @default(0) @map("pending_result_courses")
+
+  @@unique([runId, studentId], map: "training_progress_completion_student_resu_run_id_student_id_key")
+  @@index([runId, classId, sStudentId], map: "training_progress_completion_students_class_idx")
+  @@index([runId, programCompletionStatus, scheduleStatus, sStudentId], map: "training_progress_completion_students_status_idx")
+  @@map("training_progress_completion_student_results")
+}
+
+model TrainingProgressCompletionPlanResult {
+  id                             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentResultId                String  @map("student_result_id") @db.Uuid
+  planId                         String  @map("plan_id") @db.Uuid
+  planVersion                    Int     @map("plan_version")
+  academicTermId                 String  @map("academic_term_id") @db.Uuid
+  curriculumSemesterNo           Int     @map("curriculum_semester_no") @db.SmallInt
+  isDue                          Boolean @map("is_due")
+  isPass                         Boolean @map("is_pass")
+  missingMandatoryCourses        Int     @default(0) @map("missing_mandatory_courses")
+  missingRequiredElectiveCourses Int     @default(0) @map("missing_required_elective_courses")
+  requiredElectiveCredits        Int     @default(0) @map("required_elective_credits")
+  passedElectiveCredits          Int     @default(0) @map("passed_elective_credits")
+  missingElectiveCredits         Int     @default(0) @map("missing_elective_credits")
+  choiceGroupResults             Json    @default("[]") @map("choice_group_results")
+  pendingResultCourses           Int     @default(0) @map("pending_result_courses")
+
+  @@unique([studentResultId, planId], map: "training_progress_completion_plan_student_result_id_plan_id_key")
+  @@index([studentResultId, isDue, isPass], map: "training_progress_completion_plan_results_student_idx")
+  @@map("training_progress_completion_plan_results")
+}
+
+model TrainingProgressCompletionGroupResult {
+  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId                   String   @map("run_id") @db.Uuid
+  groupType               String   @map("group_type") @db.VarChar(16)
+  groupId                 String   @map("group_id") @db.Uuid
+  groupCode               String   @map("group_code") @db.VarChar(64)
+  groupName               String?  @map("group_name") @db.VarChar(320)
+  totalStudents           Int      @default(0) @map("total_students")
+  completedStudents       Int      @default(0) @map("completed_students")
+  incompleteStudents      Int      @default(0) @map("incomplete_students")
+  cannotDetermineStudents Int      @default(0) @map("cannot_determine_students")
+  onTrackStudents         Int      @default(0) @map("on_track_students")
+  behindScheduleStudents  Int      @default(0) @map("behind_schedule_students")
+  calculatedAt            DateTime @default(now()) @map("calculated_at") @db.Timestamptz(6)
+  pendingResultStudents   Int      @default(0) @map("pending_result_students")
+
+  @@unique([runId, groupType, groupId], map: "training_progress_completion_gro_run_id_group_type_group_id_key")
+  @@index([runId, groupType, groupCode], map: "training_progress_completion_group_results_idx")
+  @@map("training_progress_completion_group_results")
+}
+
+model AcademicWarningPolicy {
+  id                     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                   String   @db.VarChar(160)
+  termGpaThreshold       Decimal  @map("term_gpa_threshold") @db.Decimal(4, 2)
+  cumulativeGpaThreshold Decimal  @map("cumulative_gpa_threshold") @db.Decimal(4, 2)
+  version                Int
+  status                 String   @default("active") @db.VarChar(16)
+  createdBy              String?  @map("created_by") @db.Uuid
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("academic_warning_policies")
+}
+
+model AcademicWarningRun {
+  id                       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cohortId                 String    @map("cohort_id") @db.Uuid
+  trainingProgramId        String    @map("training_program_id") @db.Uuid
+  assessmentAcademicTermId String    @map("assessment_academic_term_id") @db.Uuid
+  policyId                 String?   @map("policy_id") @db.Uuid
+  policyVersion            Int?      @map("policy_version")
+  completionRunId          String?   @map("completion_run_id") @db.Uuid
+  progressRunId            String?   @map("progress_run_id") @db.Uuid
+  status                   String    @db.VarChar(16)
+  totalStudents            Int       @default(0) @map("total_students")
+  warningStudents          Int       @default(0) @map("warning_students")
+  mediumStudents           Int       @default(0) @map("medium_students")
+  highStudents             Int       @default(0) @map("high_students")
+  errorMessage             String?   @map("error_message")
+  startedAt                DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt              DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdBy                String?   @map("created_by") @db.Uuid
+
+  @@index([cohortId, trainingProgramId, assessmentAcademicTermId, startedAt(sort: Desc)], map: "academic_warning_runs_scope_idx")
+  @@map("academic_warning_runs")
+}
+
+model AcademicWarningStudentResult {
+  id                       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId                    String   @map("run_id") @db.Uuid
+  studentId                String   @map("student_id") @db.Uuid
+  classId                  String?  @map("class_id") @db.Uuid
+  cohortId                 String?  @map("cohort_id") @db.Uuid
+  sStudentId               String   @map("s_student_id") @db.VarChar(32)
+  sStudentName             String   @map("s_student_name") @db.VarChar(320)
+  sClassName               String?  @map("s_class_name") @db.VarChar(320)
+  sProgramCode             String?  @map("s_program_code") @db.VarChar(64)
+  termRegisteredCredits    Decimal? @map("term_registered_credits") @db.Decimal(8, 2)
+  termGpa4                 Decimal? @map("term_gpa_4") @db.Decimal(4, 2)
+  termGpa10                Decimal? @map("term_gpa_10") @db.Decimal(4, 2)
+  cumulativeGpa4           Decimal? @map("cumulative_gpa_4") @db.Decimal(4, 2)
+  cumulativeGpa10          Decimal? @map("cumulative_gpa_10") @db.Decimal(4, 2)
+  registrationStatus       String   @map("registration_status") @db.VarChar(16)
+  scheduleStatus           String   @map("schedule_status") @db.VarChar(24)
+  academicWarningDecisions Int      @default(0) @map("academic_warning_decisions")
+  maxSeverity              String   @map("max_severity") @db.VarChar(16)
+  reasonCount              Int      @default(0) @map("reason_count")
+  dataError                String?  @map("data_error")
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([runId, studentId])
+  @@index([runId, maxSeverity, sStudentId], map: "academic_warning_student_results_run_idx")
+  @@map("academic_warning_student_results")
+}
+
+model AcademicWarningReason {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentResultId String   @map("student_result_id") @db.Uuid
+  reasonCode      String   @map("reason_code") @db.VarChar(48)
+  severity        String   @db.VarChar(16)
+  title           String   @db.VarChar(200)
+  details         Json     @default("{}")
+  sourceType      String?  @map("source_type") @db.VarChar(64)
+  sourceId        String?  @map("source_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([studentResultId, reasonCode])
+  @@index([reasonCode, studentResultId], map: "academic_warning_reasons_code_idx")
+  @@map("academic_warning_reasons")
+}
+
+model AcademicWarningGroupResult {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId           String   @map("run_id") @db.Uuid
+  groupType       String   @map("group_type") @db.VarChar(16)
+  groupId         String?  @map("group_id") @db.Uuid
+  groupCode       String   @map("group_code") @db.VarChar(64)
+  groupName       String?  @map("group_name") @db.VarChar(320)
+  totalStudents   Int      @default(0) @map("total_students")
+  warningStudents Int      @default(0) @map("warning_students")
+  mediumStudents  Int      @default(0) @map("medium_students")
+  highStudents    Int      @default(0) @map("high_students")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([runId, groupType, groupId])
+  @@index([runId, groupType, groupCode], map: "academic_warning_group_results_run_idx")
+  @@map("academic_warning_group_results")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model training_progress_completion_course_results {
+  id                       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  plan_result_id           String  @db.Uuid
+  course_id                String  @db.Uuid
+  s_course_code            String  @db.VarChar(64)
+  s_course_name            String  @db.VarChar(320)
+  s_credits                Int     @db.SmallInt
+  requirement_type         String  @db.VarChar(16)
+  choice_group_code        String? @db.VarChar(64)
+  is_registration_required Boolean @default(false)
+  passed                   Boolean
+  evidence_offering_id     String? @db.Uuid
+  evidence_academic_year   String? @db.VarChar(16)
+  evidence_term_code       String? @db.VarChar(16)
+  evidence_score_status    String? @db.VarChar(16)
+  pending_result           Boolean @default(false)
+
+  @@unique([plan_result_id, course_id], map: "training_progress_completion_cours_plan_result_id_course_id_key")
+  @@index([plan_result_id, passed, requirement_type, s_course_code], map: "training_progress_completion_course_results_plan_idx")
+}
+
+model WarningAction {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId  String   @map("student_id") @db.Uuid
+  runId      String?  @map("run_id") @db.Uuid
+  actionType String   @map("action_type") @db.VarChar(64)
+  note       String   @db.Text
+  actorName  String?  @map("actor_name") @db.VarChar(255)
+  status     String   @default("IN_PROGRESS") @db.VarChar(32)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([studentId, createdAt(sort: Desc)], map: "warning_actions_student_idx")
+  @@map("warning_actions")
+}
