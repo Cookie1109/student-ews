@@ -7,7 +7,7 @@ import Breadcrumb from "@/components/Breadcrumb";
 import ToastContainer from "@/components/ui/Toast";
 import { useAuthStore } from "@/stores/authStore";
 
-export default function DashboardLayout({
+export default function DashboardShell({
   children,
 }: {
   children: React.ReactNode;

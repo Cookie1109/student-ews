@@ -1,5 +1,11 @@
 # Hệ thống Cảnh báo Sớm Học vụ (SEWS)
 
+> **Cập nhật cấu trúc mã nguồn 08/09/2026:** Repository hiện là npm monorepo:
+> `apps/frontend` (Next.js UI) và `apps/backend` (Next.js Route Handlers + Prisma),
+> chạy/build độc lập. Frontend chuyển tiếp `/api/v1` qua proxy đến backend.
+> Chưa chuyển backend sang Express/NestJS. Các mô tả Vite/Express bên dưới là thiết
+> kế trước đây; xem [README](README.md) để chạy và triển khai cấu trúc hiện tại.
+
 > **Dự án:** Xây dựng hệ thống cảnh báo sớm sinh viên cần theo dõi dựa trên dữ liệu học tập (tín chỉ, kết quả học phần, chương trình đào tạo)
 > **Chủ đầu tư:** Ban Công tác Sinh viên — Trường Đại học Đà Lạt (DLU)
 > **Nhóm phát triển:** Đinh Thị Mai Lành · Trương Võ Trọng Nhân · Võ Thị Minh Ân (CTK47A)

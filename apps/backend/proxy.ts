@@ -129,7 +129,12 @@ function nextResponse(request: NextRequest, requestId: string) {
 function isUnsafeCrossOrigin(request: NextRequest): boolean {
   if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return false;
   const origin = request.headers.get("origin");
-  return Boolean(origin && origin !== request.nextUrl.origin);
+  if (!origin) return false;
+  // Browser origin differs from backend origin after proxying.
+  // Trust explicit configuration, never client-supplied forwarded hosts.
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
+    .split(",").map((value) => value.trim()).filter(Boolean);
+  return !allowedOrigins.includes(origin);
 }
 
 export async function proxy(request: NextRequest) {
@@ -140,11 +145,11 @@ export async function proxy(request: NextRequest) {
     ? incomingRequestId
     : crypto.randomUUID();
 
-  if (isApi && PUBLIC_API_PATHS.has(pathname)) return nextResponse(request, requestId);
-  if (isApi && hasInvalidUuidSegment(pathname)) return apiError("Invalid identifier", "INVALID_ID", 400, requestId);
   if (isApi && isUnsafeCrossOrigin(request)) {
     return apiError("Cross-origin request rejected", "INVALID_ORIGIN", 403, requestId);
   }
+  if (isApi && PUBLIC_API_PATHS.has(pathname)) return nextResponse(request, requestId);
+  if (isApi && hasInvalidUuidSegment(pathname)) return apiError("Invalid identifier", "INVALID_ID", 400, requestId);
 
   const bearer = request.headers.get("authorization");
   const token = bearer?.startsWith("Bearer ")
@@ -170,8 +175,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/api/v1/:path*",
-    "/((?!api|_next/static|_next/image|favicon.ico|login|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
+  matcher: ["/api/v1/:path*"],
 };

@@ -1,4 +1,5 @@
 const fs = require("node:fs");
+const path = require("node:path");
 const crypto = require("node:crypto");
 const { PrismaClient } = require("@prisma/client");
 
@@ -27,7 +28,8 @@ const AUTH_TABLES = new Set([
 ]);
 
 function loadDatabaseUrl() {
-  for (const file of [".env", ".env.local"]) {
+  for (const name of [".env", ".env.local"]) {
+    const file = path.resolve(__dirname, "..", name);
     if (!fs.existsSync(file)) continue;
     for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
       const match = line.match(/^DATABASE_URL=(.*)$/);

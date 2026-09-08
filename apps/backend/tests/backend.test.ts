@@ -13,6 +13,10 @@ import { hasInvalidUuidSegment, hasPermission, proxy, requiredPermission } from 
 import { checkLoginAttempt, clearLoginFailures, loginAttemptKey, recordLoginFailure } from "../lib/auth/login-rate-limit";
 import { parseCredits, parseDecimal, parseScore10, parseScore4 } from "../lib/services/grades";
 import { parsePagination } from "../lib/utils/api-response";
+import { AuthService } from "../lib/services/auth";
+import { POST as loginRoute } from "../app/api/v1/auth/login/route";
+import { POST as refreshRoute } from "../app/api/v1/auth/refresh/route";
+import { signAccessToken } from "../lib/auth/jwt";
 
 const IDS = {
   student: "11111111-1111-4111-8111-111111111111",
@@ -32,7 +36,7 @@ test("API permission policy follows the Phase 2 contract", () => {
   assert.equal(requiredPermission("/api/v1/training-progress/completion-runs/preview", "POST"), "progress.calculate");
 });
 
-test("Next.js exposes every SWE OpenAPI method and path", () => {
+function apiOperations(): Set<string> {
   const root = process.cwd();
   const apiRoot = path.join(root, "app", "api", "v1");
   const files: string[] = [];
@@ -63,16 +67,120 @@ test("Next.js exposes every SWE OpenAPI method and path", () => {
     }
   }
 
-  const specification = JSON.parse(fs.readFileSync(
-    path.join(root, "SWE", "cntt-portal-v2", "backend", "internal", "httpapi", "docs", "openapi.json"),
-    "utf8",
-  )) as { paths: Record<string, Record<string, unknown>> };
+  return actual;
+}
+
+test("backend preserves the complete pre-split API operation inventory", () => {
+  const expected = JSON.parse(fs.readFileSync(
+    path.join(process.cwd(), "tests", "fixtures", "api-operations.json"), "utf8",
+  )) as string[];
+  assert.deepEqual([...apiOperations()].sort(), expected);
+});
+
+test("backend exposes every external SWE OpenAPI method and path when supplied", (context) => {
+  const specificationPath = process.env.SWE_OPENAPI_PATH || path.resolve(
+    process.cwd(), "../../SWE/cntt-portal-v2/backend/internal/httpapi/docs/openapi.json",
+  );
+  if (!process.env.SWE_OPENAPI_PATH && !fs.existsSync(specificationPath)) {
+    context.skip("External SWE specification is absent; the pre-split inventory is checked separately");
+    return;
+  }
+  const actual = apiOperations();
+  const specification = JSON.parse(fs.readFileSync(specificationPath, "utf8")) as {
+    paths: Record<string, Record<string, unknown>>;
+  };
   const expected = Object.entries(specification.paths).flatMap(([routePath, operations]) =>
     Object.keys(operations)
       .filter((method) => ["get", "post", "put", "patch", "delete"].includes(method))
       .map((method) => `${method.toUpperCase()} ${routePath.replace(/\{[^}]+\}/g, "{param}")}`),
   );
   assert.deepEqual(expected.filter((operation) => !actual.has(operation)), []);
+});
+
+test("backend accepts configured frontend origins and rejects forged origins including auth routes", async () => {
+  const previous = process.env.ALLOWED_ORIGINS;
+  process.env.ALLOWED_ORIGINS = "https://students.example.edu";
+  try {
+    const allowed = await proxy(new NextRequest("http://127.0.0.1:3001/api/v1/auth/login", {
+      method: "POST", headers: { origin: "https://students.example.edu" },
+    }));
+    assert.equal(allowed.headers.get("x-middleware-next"), "1");
+
+    for (const route of ["/auth/login", "/auth/refresh", "/auth/logout", "/students"]) {
+      const denied = await proxy(new NextRequest(`http://127.0.0.1:3001/api/v1${route}`, {
+        method: "POST",
+        headers: { origin: "https://evil.example", "x-forwarded-host": "evil.example" },
+      }));
+      assert.equal(denied.status, 403);
+      assert.equal((await denied.json()).error.code, "INVALID_ORIGIN");
+    }
+    const unsigned = await proxy(new NextRequest("http://127.0.0.1:3001/api/v1/students", {
+      method: "POST", headers: { origin: "https://students.example.edu" },
+    }));
+    assert.equal(unsigned.status, 401);
+  } finally {
+    if (previous === undefined) delete process.env.ALLOWED_ORIGINS;
+    else process.env.ALLOWED_ORIGINS = previous;
+  }
+});
+
+test("login and refresh preserve HttpOnly cookies and API authorization after the split", async (context) => {
+  const previousSecret = process.env.JWT_SECRET;
+  process.env.JWT_SECRET = "test-only-secret-for-monorepo-cookie-regression";
+  try {
+    const actor = {
+      userId: IDS.student, username: "migration-test", fullName: "Migration Test",
+      grants: [{ role: "staff", scope: "system", permission: "student.read" }],
+    };
+    const signed = await signAccessToken(actor.userId, actor.username, actor);
+    const tokens = {
+      accessToken: signed.token, refreshToken: "test-refresh-before",
+      expiresAt: signed.expiresAt.toISOString(),
+    };
+    // Stub persistence only; exercise real route handlers, JWT and cookies.
+    const loginMock = context.mock.method(AuthService, "login", async () => ({
+      user: { id: actor.userId, username: actor.username, fullName: actor.fullName, email: null, isActive: true },
+      actor, tokens,
+    }));
+    const response = await loginRoute(new NextRequest("http://backend:3001/api/v1/auth/login", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ username: actor.username, password: "test-only" }),
+    }));
+    assert.equal(response.status, 200);
+    assert.equal(loginMock.mock.callCount(), 1);
+    assert.equal(response.headers.getSetCookie().length, 2);
+    for (const cookie of response.headers.getSetCookie()) {
+      assert.match(cookie, /HttpOnly/i);
+      assert.match(cookie, /SameSite=lax/i);
+    }
+    assert.equal(response.cookies.get("sms_access_token")?.path, "/");
+    assert.equal(response.cookies.get("sms_refresh_token")?.path, "/api/v1/auth");
+    assert.equal("tokens" in await response.json(), false);
+
+    const cookieHeader = `sms_access_token=${response.cookies.get("sms_access_token")!.value}`;
+    const authorized = await proxy(new NextRequest("http://backend:3001/api/v1/students", {
+      headers: { cookie: cookieHeader },
+    }));
+    assert.equal(authorized.headers.get("x-middleware-next"), "1");
+    const forbidden = await proxy(new NextRequest(`http://backend:3001/api/v1/students/${IDS.student}`, {
+      method: "DELETE", headers: { cookie: cookieHeader },
+    }));
+    assert.equal(forbidden.status, 403);
+
+    const refreshMock = context.mock.method(AuthService, "refresh", async () => ({
+      ...tokens, refreshToken: "test-refresh-after",
+    }));
+    const refreshed = await refreshRoute(new NextRequest("http://backend:3001/api/v1/auth/refresh", {
+      method: "POST", headers: { cookie: "sms_refresh_token=test-refresh-before" },
+    }));
+    assert.equal(refreshed.status, 200);
+    assert.equal(refreshMock.mock.calls[0].arguments[0], "test-refresh-before");
+    assert.equal(refreshed.cookies.get("sms_refresh_token")?.value, "test-refresh-after");
+    assert.equal(refreshed.headers.getSetCookie().length, 2);
+  } finally {
+    if (previousSecret === undefined) delete process.env.JWT_SECRET;
+    else process.env.JWT_SECRET = previousSecret;
+  }
 });
 
 test("SWE pagination names and safety limits remain compatible", () => {

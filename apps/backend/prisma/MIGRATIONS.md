@@ -1,5 +1,9 @@
 # Prisma migrations
 
+Run Prisma commands from `apps/backend`, or use `npm run db:deploy` /
+`npm run db:migrate` at the monorepo root. The schema and migration files were
+moved without changes; splitting the applications does not require a migration.
+
 `20260907000000_swe_baseline` is the baseline for the schema migrated from the SWE Go backend.
 
 - New database: run `npx prisma migrate deploy`.

@@ -6,11 +6,11 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   {
-    files: ["app/api/**/*.ts", "lib/**/*.ts"],
+    files: ["**/*.ts", "**/*.tsx"],
     rules: {
-      // The copied SWE adapters still contain untyped raw-query DTOs. Keep them
-      // visible to TypeScript while new/touched code uses explicit types.
-      "@typescript-eslint/no-explicit-any": "off",
+      "no-restricted-imports": ["error", {
+        "patterns": ["@prisma/*", "**/backend/**", "@/lib/prisma", "@/lib/services/**", "@/lib/auth/**"]
+      }],
     },
   },
   // Override default ignores of eslint-config-next.
@@ -20,9 +20,6 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "dist/**",
-    "SWE/**",
-    "src/_pages/**",
-    ".agents/**",
     "next-env.d.ts",
   ]),
 ]);
