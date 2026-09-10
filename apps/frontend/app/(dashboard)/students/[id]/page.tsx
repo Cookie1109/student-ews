@@ -21,7 +21,7 @@ const scheduleLabel = (status?: string | null) => {
   if (status === "on_track") return "Đúng tiến độ";
   if (status === "behind_schedule") return "Chậm tiến độ";
   if (status === "pending_result") return "Chờ kết quả";
-  if (status === "no_due_courses") return "Chưa đến hạn đánh giá";
+  if (status === "no_due_plan") return "Chưa đến hạn đánh giá";
   return "Chưa có kỳ đánh giá";
 };
 
@@ -49,9 +49,7 @@ export default function StudentDetailPage() {
     feeObjectDicId: "MIEN_GIAM_50",
     feeObjectName: "Miễn giảm 50% học phí",
     coefficient: 0.5,
-    decisionNumber: "QĐ-DLU-2024",
-    yearStudy: "2024-2025",
-    termId: "HK01",
+    decisionNumber: "",
   });
   const [feeSubmitting, setFeeSubmitting] = useState(false);
 
@@ -61,7 +59,6 @@ export default function StudentDetailPage() {
     actionType: "COUNSELING",
     note: "",
     status: "IN_PROGRESS",
-    actorName: "Cố vấn học tập",
   });
   const [actionSubmitting, setActionSubmitting] = useState(false);
 
@@ -481,8 +478,8 @@ export default function StudentDetailPage() {
           {(summariesData?.conductRecords || []).length > 0 && (
             <div className="rounded-xl border border-slate-200 overflow-hidden">
               <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
-                <h4 className="text-sm font-bold text-slate-900">Điểm rèn luyện chính thức</h4>
-                <p className="text-[11px] text-slate-500 mt-0.5">Dữ liệu theo lớp và học kỳ từ hệ thống đào tạo</p>
+                <h4 className="text-sm font-bold text-slate-900">Điểm rèn luyện đã ghi nhận</h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">Dữ liệu nguồn theo lớp và học kỳ; xem trạng thái duyệt ở từng bản ghi</p>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
@@ -864,11 +861,11 @@ export default function StudentDetailPage() {
                     ? "Sinh viên thuộc diện Nguy cơ cao (Cảnh báo Đỏ)"
                     : student?.warningLevel === "yellow"
                     ? "Sinh viên thuộc diện Cần lưu ý theo dõi (Cảnh báo Vàng)"
-                    : "Sinh viên trong tình trạng học vụ An toàn (Mức Xanh)"}
+                    : "Chưa ghi nhận tín hiệu cảnh báo theo tiêu chí hiện tại (Mức Xanh)"}
                 </h3>
                 <p className="text-xs text-slate-600 mt-0.5">
                   {student?.warningLevel === "red"
-                    ? "Cần khẩn trương liên hệ, tư vấn lộ trình học tập và ghi nhận hành động can thiệp theo quy chế."
+                    ? "Cần khẩn trương liên hệ, tư vấn lộ trình học tập và ghi nhận hành động hỗ trợ."
                     : student?.warningLevel === "yellow"
                     ? "Có dấu hiệu nợ học phần hoặc GPA giảm, cố vấn học tập cần theo dõi và đôn đốc sinh viên."
                     : "Tiến độ đào tạo và kết quả tích lũy đảm bảo theo khung chương trình đào tạo."}
@@ -1080,9 +1077,9 @@ export default function StudentDetailPage() {
                             {act.actionType === "MEETING"
                               ? "Gặp trực tiếp"
                               : act.actionType === "NOTIFY_EMAIL"
-                              ? "Gửi email cảnh báo"
+                              ? "Đã gửi email (ghi nhận)"
                               : act.actionType === "SCHEDULE_MEETING"
-                              ? "Lịch hẹn làm việc"
+                              ? "Lịch hẹn (ghi nhận)"
                               : "Tư vấn học vụ"}
                           </span>
                           <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
@@ -1244,28 +1241,8 @@ export default function StudentDetailPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Năm học</label>
-              <input
-                type="text"
-                value={feeForm.yearStudy}
-                onChange={(e) => setFeeForm({ ...feeForm, yearStudy: e.target.value })}
-                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Học kỳ áp dụng</label>
-              <select
-                value={feeForm.termId}
-                onChange={(e) => setFeeForm({ ...feeForm, termId: e.target.value })}
-                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800"
-              >
-                <option value="HK01">Học kỳ 1 (HK01)</option>
-                <option value="HK02">Học kỳ 2 (HK02)</option>
-                <option value="HK03">Học kỳ hè (HK03)</option>
-              </select>
-            </div>
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
+            Chính sách sẽ được gắn với học kỳ hiện tại đã cấu hình trong hệ thống.
           </div>
 
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
@@ -1311,7 +1288,6 @@ export default function StudentDetailPage() {
                   studentId: student?.id || studentId,
                   actionType: actionForm.actionType,
                   note: actionForm.note.trim(),
-                  actorName: actionForm.actorName,
                   status: actionForm.status,
                 }),
               });
@@ -1322,7 +1298,6 @@ export default function StudentDetailPage() {
                   actionType: "COUNSELING",
                   note: "",
                   status: "IN_PROGRESS",
-                  actorName: "Cố vấn học tập",
                 });
                 alert("Đã lưu nhật ký can thiệp học vụ thành công!");
                 await reloadStudent();
@@ -1346,9 +1321,9 @@ export default function StudentDetailPage() {
               className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800"
             >
               <option value="COUNSELING">Tư vấn học vụ / Kế hoạch đăng ký</option>
-              <option value="MEETING">Mời gặp gỡ trực tiếp</option>
-              <option value="NOTIFY_EMAIL">Gửi email đôn đốc / cảnh báo</option>
-              <option value="SCHEDULE_MEETING">Lên lịch hẹn làm việc</option>
+              <option value="MEETING">Ghi nhận buổi gặp trực tiếp</option>
+              <option value="NOTIFY_EMAIL">Ghi nhận email đã gửi</option>
+              <option value="SCHEDULE_MEETING">Ghi nhận lịch hẹn đã thống nhất</option>
               <option value="OTHER">Hành động hỗ trợ khác</option>
             </select>
           </div>
@@ -1361,20 +1336,9 @@ export default function StudentDetailPage() {
               className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800"
             >
               <option value="IN_PROGRESS">Đang theo dõi (Chưa cải thiện nhiều)</option>
-              <option value="RESOLVED">Đã ổn định / Giải quyết xong</option>
-              <option value="ESCALATED">Báo cáo cấp trên / Lãnh đạo Khoa (Leo thang)</option>
+              <option value="RESOLVED">Đã hoàn tất hành động hỗ trợ</option>
+              <option value="ESCALATED">Đã chuyển cấp theo dõi</option>
             </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Người ghi nhận / Cán bộ xử lý</label>
-            <input
-              type="text"
-              required
-              value={actionForm.actorName}
-              onChange={(e) => setActionForm({ ...actionForm, actorName: e.target.value })}
-              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800"
-            />
           </div>
 
           <div>

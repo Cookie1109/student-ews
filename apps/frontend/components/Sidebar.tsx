@@ -140,7 +140,7 @@ const coreNavItems: NavItem[] = [
   {
     id: "graduation-forecast",
     href: "/graduation-forecast",
-    label: "Dự kiến tốt nghiệp",
+    label: "Hoàn thành CTĐT",
     icon: Icons.graduation,
     permission: "progress.read",
   },
@@ -181,7 +181,7 @@ const coreNavItems: NavItem[] = [
     href: "/settings",
     label: "Cấu hình",
     icon: Icons.settings,
-    permissions: ["academic_term.manage", "role.manage"],
+    permission: "academic_warning.policy.manage",
   },
 ];
 
@@ -334,20 +334,20 @@ export default function Sidebar({ collapsed, onToggle, onCloseMobile }: SidebarP
         })}
       </nav>
 
-      {/* Academic Context Footer */}
+      {/* Access context footer */}
       <div className="p-3 border-t border-[var(--color-border)] bg-[var(--color-surface)]">
         {!collapsed ? (
           <div className="flex items-center justify-between text-xs text-[var(--color-text-secondary)] bg-[var(--color-surface2)]/60 px-3 py-2 rounded-xl">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[var(--color-green)] animate-pulse flex-shrink-0" />
-              <span className="font-medium text-[11px]">Năm học 2024–2025</span>
+              <span className="font-medium text-[11px]">Dữ liệu theo quyền được cấp</span>
             </div>
             <span className="text-[10px] bg-white border border-[var(--color-border)] px-1.5 py-0.5 rounded font-mono">
-              HK1
+              RBAC
             </span>
           </div>
         ) : (
-          <div className="flex justify-center" title="Năm học 2024–2025 • HK1">
+          <div className="flex justify-center" title="Dữ liệu theo quyền được cấp">
             <span className="w-2.5 h-2.5 rounded-full bg-[var(--color-green)]" />
           </div>
         )}

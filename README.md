@@ -13,7 +13,7 @@ chạy, build và triển khai độc lập.
 - Dashboard tổng quan và hồ sơ chi tiết sinh viên.
 - Quản lý sinh viên, lớp, khóa học, năm học và học kỳ.
 - Quản lý chương trình đào tạo, học phần và kế hoạch học tập.
-- Theo dõi tiến độ đào tạo, đánh giá hoàn thành và dự báo tốt nghiệp.
+- Theo dõi tiến độ đào tạo và đánh giá mức độ hoàn thành yêu cầu học phần của CTĐT.
 - Cảnh báo học vụ, cấu hình chính sách và ghi nhận hành động theo dõi.
 - Quản lý điểm, quyết định, chính sách miễn giảm học phí; nhập và xuất dữ liệu.
 - Báo cáo học vụ; quản lý tài khoản, vai trò, quyền và phân công cố vấn.
@@ -173,7 +173,7 @@ quy tắc lint để che lỗi. Lint backend, test và build được kiểm tra
 
 ## Tài liệu liên quan
 
-- [Kiến trúc và nghiệp vụ hệ thống](ARCHITECTURE.md).
+- [Kiến trúc và nghiệp vụ hệ thống](docs/ARCHITECTURE.md).
 - [Schema database](apps/backend/prisma/schema.prisma).
 - [Hướng dẫn migration](apps/backend/prisma/MIGRATIONS.md).
 - [Danh sách phương thức API](apps/backend/tests/fixtures/api-operations.json).

@@ -43,10 +43,10 @@ type WarningReport = {
   page: number;
   pageSize: number;
   totalPages: number;
-  counts: { students: number; evaluated: number; unassessed: number; high: number; medium: number; safe: number };
+  counts: { students: number; evaluated: number; available: number; termGpaAvailable: number; cumulativeGpaAvailable: number; unassessed: number; high: number; medium: number; safe: number };
   policy: { name: string; termGpaThreshold: number; cumulativeGpaThreshold: number; configured: boolean };
-  latestPeriod: { label: string; academicYear: string; termCode: string } | null;
-  trend: Array<{ label: string; high: number; medium: number; evaluated: number }>;
+  latestPeriod: { label: string; academicYear: string; termCode: string; termGpaAvailable: number } | null;
+  trend: Array<{ label: string; high: number; medium: number; evaluated: number; available: number; termGpaAvailable: number }>;
   classBreakdown: ClassWarningBreakdown[];
 };
 
@@ -60,6 +60,95 @@ const reasonLabel = (code: string) => {
 };
 
 const csvCell = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+
+type PieTooltipItem = {
+  name?: string;
+  value?: number;
+  color?: string;
+  severity?: Severity | null;
+};
+
+type PieTooltipProps = {
+  active?: boolean;
+  payload?: Array<{
+    name?: string;
+    value?: number;
+    payload?: PieTooltipItem;
+  }>;
+  totalStudents: number;
+};
+
+function WarningPieTooltip({ active, payload, totalStudents }: PieTooltipProps) {
+  if (!active || !payload || !payload.length) return null;
+  const entry = payload[0];
+  const item = entry.payload;
+  const name = item?.name || entry.name || "";
+  const value = Number(item?.value ?? entry.value ?? 0);
+  const color = item?.color || "#64748B";
+  const total = totalStudents > 0 ? totalStudents : 1;
+  const percent = ((value / total) * 100).toFixed(1);
+
+  return (
+    <div className="bg-white px-3.5 py-2.5 rounded-xl border border-slate-200 shadow-xl text-xs space-y-1.5 min-w-[180px] pointer-events-none">
+      <div className="flex items-center gap-2">
+        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+        <span className="font-semibold text-slate-800 leading-tight">{name}</span>
+      </div>
+      <div className="flex items-baseline justify-between gap-3 pt-1 border-t border-slate-100">
+        <span className="text-slate-500 text-[11px]">Số sinh viên:</span>
+        <span className="font-mono text-sm font-bold text-slate-900">{value} SV</span>
+      </div>
+      <div className="flex items-baseline justify-between gap-3 text-[11px] text-slate-500">
+        <span>Tỷ lệ:</span>
+        <span className="font-mono font-semibold text-slate-700">{percent}%</span>
+      </div>
+    </div>
+  );
+}
+
+type TrendTooltipProps = {
+  active?: boolean;
+  payload?: Array<{
+    name?: string;
+    value?: number;
+    color?: string;
+    payload?: { evaluated?: number; available?: number };
+  }>;
+  label?: string;
+};
+
+function WarningTrendTooltip({ active, payload, label }: TrendTooltipProps) {
+  if (!active || !payload || !payload.length) return null;
+  const evaluated = Number(payload[0]?.payload?.evaluated ?? 0);
+  const available = Number(payload[0]?.payload?.available ?? 0);
+  return (
+    <div className="bg-white px-3.5 py-2.5 rounded-xl border border-slate-200 shadow-xl text-xs space-y-2 min-w-[180px] pointer-events-none">
+      <div className="font-bold text-slate-900 pb-1 border-b border-slate-100 flex items-center justify-between">
+        <span>{label}</span>
+        <span className="text-[10px] text-slate-400 font-normal">Học kỳ</span>
+      </div>
+      <div className="space-y-1">
+        {payload.map((entry) => (
+          <div key={entry.name} className="flex items-center justify-between gap-3 text-[11px] text-slate-600">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+              <span>{entry.name}</span>
+            </div>
+            <span className="font-mono font-bold text-slate-900">{entry.value} SV</span>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-100 text-[11px] text-slate-500">
+        <span>Đủ dữ liệu phân loại</span>
+        <span className="font-mono font-semibold text-slate-700">{evaluated} SV</span>
+      </div>
+      <div className="flex items-center justify-between gap-3 text-[11px] text-slate-500">
+        <span>Có dữ liệu trong kỳ</span>
+        <span className="font-mono font-semibold text-slate-700">{available} SV</span>
+      </div>
+    </div>
+  );
+}
 
 export default function ReportsPage() {
   const router = useRouter();
@@ -190,7 +279,8 @@ export default function ReportsPage() {
   const levelCounts = [
     { name: "Đỏ – Nguy cơ cao", value: counts.high, color: "#DC2626", severity: "high" as const },
     { name: "Vàng – Cần lưu ý", value: counts.medium, color: "#EAB308", severity: "medium" as const },
-    { name: "Xanh – An toàn", value: counts.safe, color: "#22C55E", severity: null },
+    { name: "Xanh – Không có cảnh báo", value: counts.safe, color: "#22C55E", severity: null },
+    { name: "Xám – Chưa đủ dữ liệu kỳ", value: counts.unassessed, color: "#94A3B8", severity: null },
   ];
 
   return (
@@ -199,7 +289,7 @@ export default function ReportsPage() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="w-2.5 h-2.5 rounded-full bg-[var(--color-primary)]" />
-            <span className="text-xs font-semibold text-[var(--color-primary)] uppercase tracking-wider">Dữ liệu đến {report.latestPeriod?.label || "kỳ gần nhất"}</span>
+            <span className="text-xs font-semibold text-[var(--color-primary)] uppercase tracking-wider">Kỳ thống kê: {report.latestPeriod?.label || "chưa xác định"}</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>Báo cáo tổng hợp học vụ & cảnh báo sớm</h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">Bấm vào mức cảnh báo hoặc lớp để xem danh sách sinh viên tương ứng.</p>
@@ -226,50 +316,89 @@ export default function ReportsPage() {
         <button type="button" onClick={() => openStudents({ label: "Nguy cơ cao", severity: "high" })} className="text-left p-4 border border-red-200 bg-red-50/40 rounded-2xl shadow-xs hover:border-red-400 hover:-translate-y-0.5 active:translate-y-0 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400">
           <span className="text-[10px] uppercase font-bold text-red-700 block">Nguy cơ cao (Mức Đỏ)</span>
           <span className="text-2xl font-bold font-mono text-red-600 mt-1 block">{counts.high}</span>
-          <span className="text-[11px] text-red-700">Xem danh sách sinh viên →</span>
+          <span className="text-[11px] text-red-700">{counts.cumulativeGpaAvailable} SV có GPA tích lũy · Xem danh sách →</span>
         </button>
         <button type="button" onClick={() => openStudents({ label: "Cần lưu ý", severity: "medium" })} className="text-left p-4 border border-amber-200 bg-amber-50/40 rounded-2xl shadow-xs hover:border-amber-400 hover:-translate-y-0.5 active:translate-y-0 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400">
           <span className="text-[10px] uppercase font-bold text-amber-700 block">Cần lưu ý (Mức Vàng)</span>
           <span className="text-2xl font-bold font-mono text-amber-600 mt-1 block">{counts.medium}</span>
-          <span className="text-[11px] text-amber-700">Xem danh sách sinh viên →</span>
+          <span className="text-[11px] text-amber-700">{counts.termGpaAvailable ? `${counts.termGpaAvailable} SV có GPA học kỳ · Xem danh sách →` : "Chưa có GPA học kỳ để xác định"}</span>
         </button>
         <div className="p-4 bg-white border border-emerald-200 rounded-2xl shadow-xs">
-          <span className="text-[10px] uppercase font-bold text-emerald-700 block">Phạm vi đã đánh giá</span>
+          <span className="text-[10px] uppercase font-bold text-emerald-700 block">Đủ dữ liệu phân loại</span>
           <span className="text-2xl font-bold font-mono text-emerald-600 mt-1 block">{evaluatedRate.toFixed(1)}%</span>
-          <span className="text-[11px] text-emerald-700">{counts.evaluated}/{counts.students} sinh viên</span>
+          <span className="text-[11px] text-emerald-700">{counts.available}/{counts.students} có dữ liệu kỳ</span>
         </div>
       </section>
 
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 shadow-xs p-5">
           <div className="flex items-center justify-between mb-4">
-            <div><h2 className="font-bold text-slate-900 text-sm" style={{ fontFamily: "Outfit, sans-serif" }}>Phân bố mức cảnh báo</h2><p className="text-xs text-slate-400">Bấm lát Đỏ hoặc Vàng để xem sinh viên</p></div>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">{counts.evaluated} SV</span>
+            <div><h2 className="font-bold text-slate-900 text-sm" style={{ fontFamily: "Outfit, sans-serif" }}>Phân bố mức cảnh báo</h2><p className="text-xs text-slate-400">Theo {report.latestPeriod?.label || "kỳ gần nhất đủ dữ liệu"} · {report.latestPeriod?.termGpaAvailable || 0}/{counts.students} SV có GPA học kỳ</p></div>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">{counts.students} SV</span>
           </div>
           <div className="h-[230px] w-full">
-            <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={levelCounts} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={4} dataKey="value">
-              {levelCounts.map((entry) => <Cell key={entry.name} fill={entry.color} cursor={entry.severity ? "pointer" : "default"} onClick={() => entry.severity && openStudents({ label: entry.name, severity: entry.severity })} />)}
-            </Pie><Tooltip contentStyle={{ background: "#0F172A", border: "none", borderRadius: 8, color: "#fff", fontSize: 12 }} /><Legend wrapperStyle={{ fontSize: 12 }} /></PieChart></ResponsiveContainer>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={levelCounts} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={4} dataKey="value">
+                  {levelCounts.map((entry) => (
+                    <Cell
+                      key={entry.name}
+                      fill={entry.color}
+                      cursor={entry.severity ? "pointer" : "default"}
+                      onClick={() => entry.severity && openStudents({ label: entry.name, severity: entry.severity })}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip content={<WarningPieTooltip totalStudents={counts.students} />} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+              </PieChart>
+            </ResponsiveContainer>
           </div>
         </div>
         <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-xs p-5">
-          <div className="flex items-center justify-between mb-4"><div><h2 className="font-bold text-slate-900 text-sm" style={{ fontFamily: "Outfit, sans-serif" }}>Xu hướng cảnh báo theo học kỳ</h2><p className="text-xs text-slate-400">Tính từ dữ liệu GPA thực tế của từng kỳ</p></div><span className="text-xs font-semibold text-slate-500">Đơn vị: Sinh viên</span></div>
+          <div className="flex items-center justify-between mb-4"><div><h2 className="font-bold text-slate-900 text-sm" style={{ fontFamily: "Outfit, sans-serif" }}>Xu hướng cảnh báo theo học kỳ</h2><p className="text-xs text-slate-400">Mỗi cột dùng dữ liệu của chính kỳ đó · kết thúc tại kỳ gần nhất đủ độ phủ</p></div><span className="text-xs font-semibold text-slate-500">Đơn vị: Sinh viên</span></div>
           <div className="h-[230px] w-full">
-            {report.trend.length ? <ResponsiveContainer width="100%" height="100%"><BarChart data={report.trend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" /><XAxis dataKey="label" tick={{ fontSize: 10, fill: "#64748B" }} tickLine={false} axisLine={false} /><YAxis tick={{ fontSize: 11, fill: "#64748B" }} tickLine={false} axisLine={false} /><Tooltip contentStyle={{ background: "#0F172A", border: "none", borderRadius: 8, color: "#fff", fontSize: 12 }} /><Legend wrapperStyle={{ fontSize: 11 }} /><Bar dataKey="high" name="Nguy cơ cao (Đỏ)" fill="#EF4444" radius={[4, 4, 0, 0]} /><Bar dataKey="medium" name="Cần lưu ý (Vàng)" fill="#F59E0B" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer> : <div className="h-full grid place-items-center text-xs text-slate-400">Chưa có dữ liệu GPA theo kỳ.</div>}
+            {report.trend.length ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={report.trend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#64748B" }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: "#64748B" }} tickLine={false} axisLine={false} />
+                  <Tooltip content={<WarningTrendTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="high" name="Nguy cơ cao (Đỏ)" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="medium" name="Cần lưu ý (Vàng)" fill="#F59E0B" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full grid place-items-center text-xs text-slate-400">Chưa có dữ liệu GPA theo kỳ.</div>
+            )}
           </div>
         </div>
       </section>
 
       <section className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="p-4 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between"><div><h2 className="font-bold text-slate-900 text-sm" style={{ fontFamily: "Outfit, sans-serif" }}>Cảnh báo theo lớp sinh viên</h2><p className="text-xs text-slate-400">Bấm tên lớp hoặc số lượng Đỏ/Vàng để mở danh sách tương ứng</p></div><span className="text-xs font-semibold text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-lg">{report.classBreakdown.length} lớp</span></div>
+        <div className="p-4 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between"><div><h2 className="font-bold text-slate-900 text-sm" style={{ fontFamily: "Outfit, sans-serif" }}>Cảnh báo theo lớp sinh viên</h2><p className="text-xs text-slate-400">Bấm vào bất kỳ vị trí nào trên dòng để xem sinh viên cảnh báo của lớp</p></div><span className="text-xs font-semibold text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-lg">{report.classBreakdown.length} lớp</span></div>
         <div className="overflow-x-auto"><table className="w-full text-left text-xs">
           <thead><tr className="border-b border-slate-200 bg-slate-50/80 text-slate-500 font-semibold uppercase text-[11px]"><th className="px-4 py-3.5">Lớp học</th><th className="px-4 py-3.5 text-center">Sĩ số</th><th className="px-4 py-3.5 text-center">Nguy cơ cao</th><th className="px-4 py-3.5 text-center">Cần lưu ý</th><th className="px-4 py-3.5 text-center">Tổng cảnh báo</th><th className="px-4 py-3.5 text-right">Tỷ lệ cảnh báo</th></tr></thead>
-          <tbody className="divide-y divide-slate-100">{report.classBreakdown.map((row) => <tr key={row.classCode} className="hover:bg-slate-50 transition-colors">
-            <td className="px-4 py-3"><button type="button" onClick={() => openStudents({ label: `Lớp ${row.classCode}`, classCode: row.classCode })} className="text-left font-semibold text-slate-800 hover:text-[var(--color-primary)] focus-visible:outline-none focus-visible:underline"><span className="block">{row.classCode}</span><span className="text-[10px] text-slate-400 font-normal">{row.className}</span></button></td>
+          <tbody className="divide-y divide-slate-100">{report.classBreakdown.map((row) => <tr
+            key={row.classCode}
+            tabIndex={0}
+            aria-label={`Xem sinh viên cảnh báo lớp ${row.classCode}`}
+            onClick={() => openStudents({ label: `Tất cả cảnh báo · ${row.classCode}`, classCode: row.classCode })}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              openStudents({ label: `Tất cả cảnh báo · ${row.classCode}`, classCode: row.classCode });
+            }}
+            className="group cursor-pointer hover:bg-[var(--color-primary-light)]/45 focus-visible:bg-[var(--color-primary-light)]/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-primary)] transition-colors"
+            title={`Xem sinh viên cảnh báo lớp ${row.classCode}`}
+          >
+            <td className="px-4 py-3"><div className="flex w-full items-center justify-between gap-3 text-left font-semibold text-slate-800 group-hover:text-[var(--color-primary)]"><span><span className="block">{row.classCode}</span><span className="text-[10px] text-slate-400 font-normal">{row.className}</span></span><span aria-hidden="true" className="text-sm text-slate-300 opacity-0 -translate-x-1 transition group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100">→</span></div></td>
             <td className="px-4 py-3 text-center font-mono text-slate-700">{row.totalStudents}</td>
-            <td className="px-4 py-3 text-center"><button type="button" disabled={!row.high} onClick={() => openStudents({ label: `Nguy cơ cao · ${row.classCode}`, classCode: row.classCode, severity: "high" })} className="min-w-8 px-2 py-0.5 rounded-full bg-red-50 border border-red-200 font-mono font-bold text-red-600 hover:bg-red-100 disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400">{row.high}</button></td>
-            <td className="px-4 py-3 text-center"><button type="button" disabled={!row.medium} onClick={() => openStudents({ label: `Cần lưu ý · ${row.classCode}`, classCode: row.classCode, severity: "medium" })} className="min-w-8 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 font-mono font-bold text-amber-600 hover:bg-amber-100 disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400">{row.medium}</button></td>
-            <td className="px-4 py-3 text-center"><button type="button" disabled={!row.warningStudents} onClick={() => openStudents({ label: `Tất cả cảnh báo · ${row.classCode}`, classCode: row.classCode })} className="font-mono font-bold text-slate-900 hover:text-[var(--color-primary)] disabled:text-slate-400">{row.warningStudents} SV</button></td>
+            <td className="px-4 py-3 text-center"><span className="inline-block min-w-8 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-mono font-bold text-red-600">{row.high}</span></td>
+            <td className="px-4 py-3 text-center"><span className="inline-block min-w-8 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-mono font-bold text-amber-600">{row.medium}</span></td>
+            <td className="px-4 py-3 text-center"><span className="font-mono font-bold text-slate-900">{row.warningStudents} SV</span></td>
             <td className="px-4 py-3 text-right"><span className="font-mono font-bold text-slate-700">{row.warningRate}%</span></td>
           </tr>)}</tbody>
         </table></div>

@@ -14,6 +14,7 @@ import { checkLoginAttempt, clearLoginFailures, loginAttemptKey, recordLoginFail
 import { parseCredits, parseDecimal, parseScore10, parseScore4 } from "../lib/services/grades";
 import { parsePagination } from "../lib/utils/api-response";
 import { AuthService } from "../lib/services/auth";
+import { buildWarningTrend, selectLatestReportingPeriod, summarizeWarningTrend } from "../lib/services/reports";
 import { POST as loginRoute } from "../app/api/v1/auth/login/route";
 import { POST as refreshRoute } from "../app/api/v1/auth/refresh/route";
 import { signAccessToken } from "../lib/auth/jwt";
@@ -313,5 +314,49 @@ test("warning evaluation promotes high-severity cumulative GPA and decision reas
     "LOW_TERM_GPA",
     "LOW_CUMULATIVE_GPA",
     "ACADEMIC_WARNING_DECISION",
+  ]);
+});
+
+test("warning trend separates conclusively evaluated and partially available data", () => {
+  const trend = summarizeWarningTrend([
+    { studentId: "a", academicTermId: "t2", gpa4: null, cumulativeGpa4: 1.2 },
+    { studentId: "b", academicTermId: "t1", gpa4: 1.7, cumulativeGpa4: 2.5 },
+    { studentId: "c", academicTermId: "t1", gpa4: 3.2, cumulativeGpa4: 3.1 },
+  ], 2, 2);
+
+  assert.deepEqual(trend, {
+    high: 1,
+    medium: 1,
+    evaluated: 3,
+    available: 3,
+    termGpaAvailable: 2,
+    cumulativeGpaAvailable: 3,
+  });
+});
+
+test("reporting period selects the latest term with representative GPA coverage", () => {
+  const selected = selectLatestReportingPeriod([
+    { label: "HK02", termGpaAvailable: 577 },
+    { label: "HK03", termGpaAvailable: 88 },
+    { label: "HK01 current", termGpaAvailable: 0 },
+  ], 625);
+
+  assert.equal(selected?.label, "HK02");
+});
+
+test("warning trend uses only data from each exact term and omits empty future terms", () => {
+  const trend = buildWarningTrend([
+    { id: "t1", academicYear: "2025-2026", termCode: "HK01", termOrder: 1, label: "HK01 (2025-2026)" },
+    { id: "t2", academicYear: "2025-2026", termCode: "HK02", termOrder: 2, label: "HK02 (2025-2026)" },
+    { id: "t3", academicYear: "2025-2026", termCode: "HK03", termOrder: 3, label: "HK03 (2025-2026)" },
+  ], [
+    { studentId: "a", academicTermId: "t1", gpa4: 1.8, cumulativeGpa4: 1.9 },
+    { studentId: "b", academicTermId: "t1", gpa4: 1.7, cumulativeGpa4: 2.5 },
+    { studentId: "a", academicTermId: "t2", gpa4: null, cumulativeGpa4: 1.8 },
+  ], [], 2, 2);
+
+  assert.deepEqual(trend.map(({ label, high, medium, evaluated }) => ({ label, high, medium, evaluated })), [
+    { label: "HK01 (2025-2026)", high: 1, medium: 1, evaluated: 2 },
+    { label: "HK02 (2025-2026)", high: 1, medium: 0, evaluated: 1 },
   ]);
 });

@@ -71,7 +71,11 @@ export default function Reports() {
                   <Cell key={i} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip contentStyle={{ background: "#0F172A", border: "none", borderRadius: 8, color: "#fff", fontSize: 12 }} />
+              <Tooltip
+                contentStyle={{ backgroundColor: "#FFFFFF", borderRadius: 10, border: "1px solid #E2E8F0", fontSize: 12, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}
+                itemStyle={{ color: "#0F172A", fontWeight: 500 }}
+                labelStyle={{ color: "#0F172A", fontWeight: 600 }}
+              />
               <Legend wrapperStyle={{ fontSize: 12 }} />
             </PieChart>
           </ResponsiveContainer>
@@ -85,7 +89,12 @@ export default function Reports() {
               <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
               <XAxis dataKey="semester" tick={{ fontSize: 11, fill: "#94A3B8" }} tickLine={false} axisLine={false} />
               <YAxis tick={{ fontSize: 11, fill: "#94A3B8" }} tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={{ background: "#0F172A", border: "none", borderRadius: 8, color: "#fff", fontSize: 12 }} cursor={{ fill: "rgba(241,245,249,0.5)" }} />
+              <Tooltip
+                contentStyle={{ backgroundColor: "#FFFFFF", borderRadius: 10, border: "1px solid #E2E8F0", fontSize: 12, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}
+                itemStyle={{ color: "#0F172A", fontWeight: 500 }}
+                labelStyle={{ color: "#0F172A", fontWeight: 600 }}
+                cursor={{ fill: "rgba(241,245,249,0.5)" }}
+              />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="red" name="Đỏ" fill="#DC2626" radius={[3, 3, 0, 0]} stackId="a" />
               <Bar dataKey="yellow" name="Vàng" fill="#EAB308" radius={[3, 3, 0, 0]} stackId="a" />

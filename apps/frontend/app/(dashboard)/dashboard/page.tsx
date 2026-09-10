@@ -24,6 +24,21 @@ interface DashboardMetric {
   status: "available" | "unavailable";
 }
 
+interface FilterOption {
+  value: string;
+  label: string;
+}
+
+interface ProgressPoint {
+  code: string;
+  name: string;
+  total: number;
+  pass: number;
+  fail: number;
+  pending: number;
+  error: number;
+}
+
 const THEME_COLORS = {
   primary: "#90C63B",
   active: "#F97316",
@@ -57,48 +72,14 @@ export default function DashboardPage() {
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [programs, setPrograms] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
-  const [cohorts, setCohorts] = useState<any[]>([]);
   const [summaryData, setSummaryData] = useState<any>(null);
   const [warningStudents, setWarningStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
-  const [currentTime, setCurrentTime] = useState("");
 
-  // Load filter options
+  // Recharts needs to render after client hydration.
   useEffect(() => {
     setMounted(true);
-    setCurrentTime(new Date().toLocaleTimeString("vi-VN") + " · " + new Date().toLocaleDateString("vi-VN"));
-
-    async function loadInitialData() {
-      try {
-        const [yRes, pRes, clRes, coRes] = await Promise.all([
-          fetch("/api/v1/academic-years"),
-          fetch("/api/v1/training-programs"),
-          fetch("/api/v1/classes"),
-          fetch("/api/v1/cohorts"),
-        ]);
-
-        if (yRes.ok) {
-          const yJson = await yRes.json();
-          setAcademicYears(Array.isArray(yJson.items) ? yJson.items : Array.isArray(yJson) ? yJson : []);
-        }
-        if (pRes.ok) {
-          const pJson = await pRes.json();
-          setPrograms(Array.isArray(pJson.items) ? pJson.items : Array.isArray(pJson) ? pJson : []);
-        }
-        if (clRes.ok) {
-          const clJson = await clRes.json();
-          setClasses(Array.isArray(clJson.items) ? clJson.items : Array.isArray(clJson) ? clJson : []);
-        }
-        if (coRes.ok) {
-          const coJson = await coRes.json();
-          setCohorts(Array.isArray(coJson.items) ? coJson.items : Array.isArray(coJson) ? coJson : []);
-        }
-      } catch (err) {
-        console.error("Dashboard initial load error:", err);
-      }
-    }
-    loadInitialData();
   }, []);
 
   useEffect(() => {
@@ -119,6 +100,26 @@ export default function DashboardPage() {
         const data = await response.json();
         setSummaryData(data);
         setWarningStudents(data.academicWarnings?.items || []);
+        const options = data.filterOptions || {};
+        const optionTerms = Array.isArray(options.terms) ? options.terms : [];
+        const optionYear = data.filter?.academicYear || data.currentAcademicYear?.yearCode || "";
+        setAcademicYears((options.academicYears || []).map((item: FilterOption) => ({
+          id: item.value,
+          sYearCode: item.value,
+          terms: item.value === optionYear
+            ? optionTerms.map((term: FilterOption) => ({ id: term.value, sTermCode: term.value, sTermName: term.label }))
+            : [],
+        })));
+        setPrograms((options.programs || []).map((item: FilterOption) => ({
+          id: item.value,
+          programCode: item.value,
+          programName: item.label,
+        })));
+        setClasses((options.classes || []).map((item: FilterOption) => ({
+          id: item.value,
+          classId: item.label,
+          className: item.label,
+        })));
       } catch (err) {
         if (!(err instanceof DOMException && err.name === "AbortError")) {
           console.error("Dashboard summary load error:", err);
@@ -159,57 +160,25 @@ export default function DashboardPage() {
     ? `${metric.numerator ?? 0}/${metric.denominator ?? 0} SV`
     : unavailableLabel;
 
-  // Grade Distribution Pie Data
-  const gradeDistributionData = [
-    { name: "Xuất sắc (GPA >= 3.6)", count: Math.round(totalStudents * 0.08), rate: 8 },
-    { name: "Giỏi (3.2 - 3.59)", count: Math.round(totalStudents * 0.22), rate: 22 },
-    { name: "Khá (2.5 - 3.19)", count: Math.round(totalStudents * 0.45), rate: 45 },
-    { name: "Trung bình (2.0 - 2.49)", count: Math.round(totalStudents * 0.18), rate: 18 },
-    { name: "Yếu / Kém (< 2.0)", count: Math.round(totalStudents * 0.07), rate: 7 },
-  ];
-
-  // GPA Trend Line Chart Data
-  const gpaTrendData = [
-    { label: "HK1 22-23", average: 2.74 },
-    { label: "HK2 22-23", average: 2.81 },
-    { label: "HK1 23-24", average: 2.78 },
-    { label: "HK2 23-24", average: 2.85 },
-    { label: "HK1 24-25", average: 2.89 },
-  ];
-
-  // Program Progress Stacked Data
-  const programProgressData = [
-    { name: "CNTT", pass: 78, fail: 15, error: 7 },
-    { name: "KTPM", pass: 82, fail: 12, error: 6 },
-    { name: "KHMT", pass: 75, fail: 18, error: 7 },
-    { name: "ATTT", pass: 85, fail: 10, error: 5 },
-  ];
-
-  const cohortProgressData = [
-    { name: "K45 (Năm 4)", pass: 91, fail: 6, error: 3 },
-    { name: "K46 (Năm 3)", pass: 84, fail: 11, error: 5 },
-    { name: "K47 (Năm 2)", pass: 77, fail: 16, error: 7 },
-    { name: "K48 (Năm 1)", pass: 70, fail: 22, error: 8 },
-  ];
-
-  // Warning count by class
-  const warningByClassData = (classes.slice(0, 7).length > 0 ? classes.slice(0, 7) : [
-    { classId: "CTK45A" }, { classId: "CTK45B" }, { classId: "CTK46A" },
-    { classId: "CTK46B" }, { classId: "CTK47A" }, { classId: "CTK47B" }, { classId: "CTK48A" },
-  ]).map((c, idx) => ({
-    classId: c.classId || `Lớp ${idx + 1}`,
-    red: idx === 0 ? 4 : idx === 1 ? 3 : idx === 2 ? 5 : 2,
-    yellow: idx === 0 ? 6 : idx === 1 ? 5 : idx === 2 ? 8 : 4,
-  }));
-
-  // GPA by class data
-  const gpaByClassData = (classes.slice(0, 7).length > 0 ? classes.slice(0, 7) : [
-    { classId: "CTK45A" }, { classId: "CTK45B" }, { classId: "CTK46A" },
-    { classId: "CTK46B" }, { classId: "CTK47A" }, { classId: "CTK47B" }, { classId: "CTK48A" },
-  ]).map((c, idx) => ({
-    classId: c.classId || `Lớp ${idx + 1}`,
-    value: 2.65 + (idx % 5) * 0.08,
-  }));
+  const gradeDistributionData = Array.isArray(summaryData?.gradeDistribution) ? summaryData.gradeDistribution : [];
+  const gpaTrendData = Array.isArray(summaryData?.gpaTrend) ? summaryData.gpaTrend : [];
+  const toPercentages = (items: ProgressPoint[]) => items
+    .filter((item) => item.code !== "all" && Number(item.total) > 0)
+    .map((item) => ({
+      ...item,
+      pass: (Number(item.pass || 0) * 100) / Number(item.total),
+      fail: (Number(item.fail || 0) * 100) / Number(item.total),
+      pending: (Number(item.pending || 0) * 100) / Number(item.total),
+      error: (Number(item.error || 0) * 100) / Number(item.total),
+    }));
+  const programProgressData = toPercentages(summaryData?.programProgress || []);
+  const cohortProgressData = toPercentages(summaryData?.cohortProgress || []);
+  const programRegistrationData = toPercentages(summaryData?.programRegistrationProgress || []);
+  const cohortRegistrationData = toPercentages(summaryData?.registrationProgress || []);
+  const warningByClassData = Array.isArray(summaryData?.warningByClass) ? summaryData.warningByClass.slice(0, 7) : [];
+  const gpaByClassData = Array.isArray(summaryData?.gpaByClass)
+    ? summaryData.gpaByClass.filter((item: { value: number | null }) => item.value != null).slice(0, 7)
+    : [];
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -433,7 +402,7 @@ export default function DashboardPage() {
 
           {/* Card 5: Đăng ký đúng tiến độ */}
           <div className="bg-white border border-emerald-200/80 rounded-2xl p-4 shadow-xs bg-emerald-50/20 hover:border-emerald-400 transition-all">
-            <span className="text-[11px] font-semibold text-emerald-800 uppercase tracking-wider block">Đăng ký đúng hạn</span>
+            <span className="text-[11px] font-semibold text-emerald-800 uppercase tracking-wider block">Đáp ứng kế hoạch đăng ký</span>
             <div className="text-2xl font-bold text-emerald-600 mt-1" style={{ fontFamily: "Outfit, sans-serif" }}>
               {metricPercent(registrationMetric)}
             </div>
@@ -449,13 +418,13 @@ export default function DashboardPage() {
             <p className="text-[10px] text-amber-700/80 mt-1">{redCount} Đỏ · {yellowCount} Vàng</p>
           </div>
 
-          {/* Card 7: Dự kiến tốt nghiệp */}
+          {/* Card 7: Completion estimate */}
           <div className="bg-white border border-blue-200/80 rounded-2xl p-4 shadow-xs bg-blue-50/20 hover:border-blue-400 transition-all">
-            <span className="text-[11px] font-semibold text-blue-800 uppercase tracking-wider block">Dự kiến tốt nghiệp</span>
+            <span className="text-[11px] font-semibold text-blue-800 uppercase tracking-wider block">Ước tính hoàn thành CTĐT</span>
             <div className="text-2xl font-bold text-blue-600 mt-1" style={{ fontFamily: "Outfit, sans-serif" }}>
               {metricPercent(graduationMetric)}
             </div>
-            <p className="text-[10px] text-blue-700/80 mt-1">{metricRatio(graduationMetric, "Chưa có lần dự báo")}</p>
+            <p className="text-[10px] text-blue-700/80 mt-1">{metricRatio(graduationMetric, "Chưa có lần đánh giá")}</p>
           </div>
         </div>
       </div>
@@ -479,6 +448,8 @@ export default function DashboardPage() {
           <div className="h-[260px] w-full">
             {!mounted ? (
               <div className="h-full w-full bg-slate-50/70 animate-pulse rounded-xl" />
+            ) : gradeDistributionData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-xs text-slate-400">Chưa có dữ liệu GPA cho phạm vi đã chọn</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -490,12 +461,15 @@ export default function DashboardPage() {
                     outerRadius={90}
                     paddingAngle={3}
                   >
-                    {gradeDistributionData.map((_, index) => (
+                    {gradeDistributionData.map((_: unknown, index: number) => (
                       <Cell key={`cell-${index}`} fill={CHART_PALETTE[index % CHART_PALETTE.length]} />
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(val: any, name: any) => [`${val} SV (${gradeDistributionData.find(g => g.name === name)?.rate}%)`, name]}
+                    formatter={(value: unknown, name: unknown) => {
+                      const item = gradeDistributionData.find((group: { name: string }) => group.name === name);
+                      return [`${value} SV (${Number(item?.rate || 0).toFixed(1)}%)`, String(name)];
+                    }}
                     contentStyle={{ borderRadius: 12, border: "1px solid #E2E8F0", fontSize: 12 }}
                   />
                 </PieChart>
@@ -504,13 +478,13 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-2 mt-2 pt-3 border-t border-slate-100 text-[11px] text-slate-600">
-            {gradeDistributionData.map((item, idx) => (
+            {gradeDistributionData.map((item: { name: string; rate: number }, idx: number) => (
               <div key={item.name} className="flex items-center gap-2">
                 <span
                   className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                   style={{ backgroundColor: CHART_PALETTE[idx % CHART_PALETTE.length] }}
                 />
-                <span className="truncate">{item.name.split("(")[0]} ({item.rate}%)</span>
+                <span className="truncate">{item.name.split("(")[0].trim()}</span>
               </div>
             ))}
           </div>
@@ -523,7 +497,7 @@ export default function DashboardPage() {
               <h3 className="text-sm font-bold text-slate-900" style={{ fontFamily: "Outfit, sans-serif" }}>
                 Xu hướng GPA Tích lũy Trung bình
               </h3>
-              <p className="text-xs text-slate-500">Biến động điểm trung bình toàn khoa qua 5 học kỳ gần nhất</p>
+              <p className="text-xs text-slate-500">GPA của học kỳ đang chọn; chưa dựng xu hướng khi thiếu chuỗi kỳ</p>
             </div>
             <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
               Thang 4.0
@@ -533,6 +507,8 @@ export default function DashboardPage() {
           <div className="h-[280px] w-full">
             {!mounted ? (
               <div className="h-full w-full bg-slate-50/70 animate-pulse rounded-xl" />
+            ) : gpaTrendData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-xs text-slate-400">Chọn một học kỳ có dữ liệu để xem GPA</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={gpaTrendData} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
@@ -598,6 +574,8 @@ export default function DashboardPage() {
           <div className="h-[250px] w-full">
             {!mounted ? (
               <div className="h-full w-full bg-slate-50/70 animate-pulse rounded-xl" />
+            ) : (completionBreakdown === "program" ? programProgressData : cohortProgressData).length === 0 ? (
+              <div className="h-full flex items-center justify-center text-xs text-slate-400">Chưa có lần tính tiến độ phù hợp</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
@@ -615,6 +593,7 @@ export default function DashboardPage() {
                   <Legend wrapperStyle={{ fontSize: 12, paddingTop: 4 }} />
                   <Bar dataKey="pass" name="Đúng tiến độ" stackId="a" fill={THEME_COLORS.green} />
                   <Bar dataKey="fail" name="Chậm tiến độ" stackId="a" fill={THEME_COLORS.red} />
+                  <Bar dataKey="pending" name="Chờ kết quả" stackId="a" fill={THEME_COLORS.yellow} />
                   <Bar dataKey="error" name="Khác" stackId="a" fill={THEME_COLORS.slate} />
                 </BarChart>
               </ResponsiveContainer>
@@ -629,7 +608,7 @@ export default function DashboardPage() {
               <h3 className="text-sm font-bold text-slate-900" style={{ fontFamily: "Outfit, sans-serif" }}>
                 Tiến độ Đăng ký Học phần
               </h3>
-              <p className="text-xs text-slate-500">Tỷ lệ đăng ký đúng hạn đầu học kỳ (%)</p>
+              <p className="text-xs text-slate-500">Tỷ lệ đáp ứng học phần cần đăng ký trong kế hoạch tại thời điểm tính (%)</p>
             </div>
 
             <div className="inline-flex rounded-xl bg-slate-100 p-1 text-xs">
@@ -661,10 +640,12 @@ export default function DashboardPage() {
           <div className="h-[250px] w-full">
             {!mounted ? (
               <div className="h-full w-full bg-slate-50/70 animate-pulse rounded-xl" />
+            ) : (registrationBreakdown === "program" ? programRegistrationData : cohortRegistrationData).length === 0 ? (
+              <div className="h-full flex items-center justify-center text-xs text-slate-400">Chưa có dữ liệu đối chiếu đăng ký</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={registrationBreakdown === "program" ? programProgressData : cohortProgressData}
+                  data={registrationBreakdown === "program" ? programRegistrationData : cohortRegistrationData}
                   layout="vertical"
                   margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
                 >
@@ -677,7 +658,8 @@ export default function DashboardPage() {
                   />
                   <Legend wrapperStyle={{ fontSize: 12, paddingTop: 4 }} />
                   <Bar dataKey="pass" name="Đủ kế hoạch" stackId="b" fill={THEME_COLORS.blue} />
-                  <Bar dataKey="fail" name="Chậm đăng ký" stackId="b" fill={THEME_COLORS.active} />
+                  <Bar dataKey="fail" name="Thiếu so với kế hoạch" stackId="b" fill={THEME_COLORS.active} />
+                  <Bar dataKey="pending" name="Chờ kết quả" stackId="b" fill={THEME_COLORS.yellow} />
                   <Bar dataKey="error" name="Thiếu dữ liệu" stackId="b" fill={THEME_COLORS.slate} />
                 </BarChart>
               </ResponsiveContainer>
@@ -699,6 +681,8 @@ export default function DashboardPage() {
           <div className="h-[250px] w-full">
             {!mounted ? (
               <div className="h-full w-full bg-slate-50/70 animate-pulse rounded-xl" />
+            ) : warningByClassData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-xs text-slate-400">Chưa có cảnh báo theo lớp trong phạm vi đã chọn</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={warningByClassData} layout="vertical" margin={{ top: 10, right: 20, left: 20, bottom: 0 }}>
@@ -750,6 +734,8 @@ export default function DashboardPage() {
           <div className="h-[250px] w-full">
             {!mounted ? (
               <div className="h-full w-full bg-slate-50/70 animate-pulse rounded-xl" />
+            ) : gpaByClassData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-xs text-slate-400">Chưa có GPA theo lớp trong phạm vi đã chọn</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={gpaByClassData} layout="vertical" margin={{ top: 10, right: 20, left: 20, bottom: 0 }}>
@@ -812,7 +798,7 @@ export default function DashboardPage() {
                     </td>
                     <td className="py-3 px-4 text-slate-600">
                       <div>{st.className || "Chưa xếp lớp"}</div>
-                      <div className="text-[11px] text-slate-400">{st.programCode || "CNTT"}</div>
+                      <div className="text-[11px] text-slate-400">{st.programCode || "—"}</div>
                     </td>
                     <td className="py-3 px-4 font-mono">
                       <span className="font-semibold text-slate-900">
@@ -886,7 +872,8 @@ export default function DashboardPage() {
 
       {/* Footer Meta */}
       <div className="text-center text-[11px] text-slate-400 pt-2" suppressHydrationWarning>
-        {currentTime ? `Cập nhật lúc ${currentTime} · ` : ""}Dữ liệu tổng hợp trực tiếp từ hồ sơ học vụ hiện có
+        {summaryData?.updatedAt ? `Dữ liệu tạo lúc ${new Date(summaryData.updatedAt).toLocaleString("vi-VN")} · ` : ""}
+        Tổng hợp từ hồ sơ học vụ trong phạm vi được cấp
       </div>
     </div>
   );

@@ -5,8 +5,10 @@ import Tabs from "@/components/ui/Tabs";
 import FilterBar from "@/components/ui/FilterBar";
 import SlideOverDrawer from "@/components/ui/SlideOverDrawer";
 import Modal from "@/components/ui/Modal";
+import { useAuthStore } from "@/stores/authStore";
 
 export default function AcademicWarningsPage() {
+  const { can } = useAuthStore();
   const [activeTab, setActiveTab] = useState<"runs" | "policies">("runs");
   const [loading, setLoading] = useState(true);
   const [policies, setPolicies] = useState<any[]>([]);
@@ -41,7 +43,7 @@ export default function AcademicWarningsPage() {
 
   // Policy modal state
   const [showPolicyModal, setShowPolicyModal] = useState(false);
-  const [policyName, setPolicyName] = useState("Quy chế Cảnh báo Học vụ Khoa CNTT");
+  const [policyName, setPolicyName] = useState("Chính sách theo dõi học vụ Khoa CNTT");
   const [termGpa, setTermGpa] = useState(2.0);
   const [cumGpa, setCumGpa] = useState(2.0);
   const [policyLoading, setPolicyLoading] = useState(false);
@@ -145,7 +147,6 @@ export default function AcademicWarningsPage() {
           runId: selectedRun?.id,
           actionType,
           note: noteToSave,
-          actorName: "Cán bộ Khoa CNTT",
           status: interventionStatus,
         }),
       });
@@ -190,7 +191,10 @@ export default function AcademicWarningsPage() {
         alert("Đã thiết lập chính sách cảnh báo học vụ mới!");
         setShowPolicyModal(false);
         const pRes = await fetch("/api/v1/academic-warnings/policies");
-        if (pRes.ok) setPolicies(await pRes.json());
+        if (pRes.ok) {
+          const payload = await pRes.json();
+          setPolicies(Array.isArray(payload.items) ? payload.items : Array.isArray(payload) ? payload : []);
+        }
       } else {
         const err = await res.json();
         alert(err.error?.message || "Lỗi khi tạo chính sách");
@@ -260,7 +264,7 @@ export default function AcademicWarningsPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {activeTab === "policies" ? (
+          {activeTab === "policies" && can("academic_warning.policy.manage") ? (
             <button
               type="button"
               onClick={() => setShowPolicyModal(true)}
@@ -272,7 +276,7 @@ export default function AcademicWarningsPage() {
               </svg>
               <span>Thiết lập Chính sách Ngưỡng</span>
             </button>
-          ) : (
+          ) : activeTab === "runs" && can("academic_warning.calculate") ? (
             <button
               type="button"
               onClick={() => {
@@ -288,7 +292,7 @@ export default function AcademicWarningsPage() {
               </svg>
               <span>Quét Cảnh báo Mới</span>
             </button>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -336,10 +340,10 @@ export default function AcademicWarningsPage() {
                             {r.startedAt ? new Date(r.startedAt).toLocaleString("vi-VN") : "—"}
                           </td>
                           <td className="py-3.5 px-4 font-bold text-slate-900">
-                            {r.assessmentTermCode || "HK01"} ({r.assessmentAcademicYear || "2024-2025"})
+                            {r.assessmentTermCode || "—"} ({r.assessmentAcademicYear || "Chưa xác định"})
                           </td>
                           <td className="py-3.5 px-4 text-slate-600">
-                            {r.cohortCode || "K45"} • {r.programCode || "CNTT"}
+                            {r.cohortCode || "—"} • {r.programCode || "—"}
                           </td>
                           <td className="py-3.5 px-4 font-mono font-bold text-slate-900">{r.totalStudents || 0}</td>
                           <td className="py-3.5 px-4">
@@ -377,7 +381,7 @@ export default function AcademicWarningsPage() {
               <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900" style={{ fontFamily: "Outfit, sans-serif" }}>
-                    Quy chế & Ngưỡng Kích hoạt Cảnh báo Học vụ ({policies.length})
+                    Chính sách & Ngưỡng Theo dõi Học vụ ({policies.length})
                   </h3>
                   <p className="text-xs text-slate-500">Các tham số điểm sàn được áp dụng khi chạy động cơ cảnh báo</p>
                 </div>
@@ -429,7 +433,7 @@ export default function AcademicWarningsPage() {
         isOpen={Boolean(selectedRun)}
         onClose={() => setSelectedRun(null)}
         title="Báo cáo Chi tiết Sinh viên Cần Cảnh báo Học vụ"
-        subtitle={`Học kỳ: ${selectedRun?.assessmentTermCode || "HK01"} • ${selectedRun?.assessmentAcademicYear || "2024-2025"}`}
+        subtitle={`Học kỳ: ${selectedRun?.assessmentTermCode || "—"} • ${selectedRun?.assessmentAcademicYear || "Chưa xác định"}`}
         width="4xl"
       >
         {selectedRun && (
@@ -557,7 +561,7 @@ export default function AcademicWarningsPage() {
           isOpen={Boolean(selectedStudentDetail)}
           onClose={() => setSelectedStudentDetail(null)}
           title={`Giải trình Cảnh báo: ${selectedStudentDetail.studentName} (${selectedStudentDetail.studentCode})`}
-          description="Bằng chứng và các nguyên nhân dẫn đến vi phạm theo quy chế đào tạo"
+          description="Bằng chứng và các tín hiệu khiến sinh viên được đưa vào danh sách cần theo dõi"
           maxWidth="2xl"
         >
           <div className="space-y-5">
@@ -623,12 +627,12 @@ export default function AcademicWarningsPage() {
                       )}
                       {r.reasonCode === "REGISTRATION_BEHIND" && (
                         <span>
-                          Sinh viên không đăng ký đủ số tín chỉ tối thiểu theo quy chế học kỳ hiện tại.
+                          Đăng ký học phần tại thời điểm tính chưa đáp ứng các học phần được đánh dấu bắt buộc đăng ký trong kế hoạch.
                         </span>
                       )}
                       {r.reasonCode === "PROGRAM_PROGRESS_BEHIND" && (
                         <span>
-                          Sinh viên bị nợ các học phần tiên quyết đã đến hạn đào tạo theo lộ trình CTĐT.
+                          Sinh viên chưa đáp ứng ít nhất một yêu cầu CTĐT đã đến hạn: học phần bắt buộc, nhóm tự chọn, số tín chỉ hoặc dữ liệu kết quả.
                         </span>
                       )}
                       {r.reasonCode === "ACADEMIC_WARNING_DECISION" && (
@@ -681,20 +685,20 @@ export default function AcademicWarningsPage() {
                   <button
                     type="button"
                     disabled={actionSaving}
-                    onClick={() => handleSaveAction("NOTIFY_EMAIL", `Đã gửi email nhắc nhở cảnh báo học vụ đến sinh viên ${selectedStudentDetail.studentCode}`)}
+                    onClick={() => handleSaveAction("NOTIFY_EMAIL", `Ghi nhận cán bộ đã gửi email nhắc nhở học vụ đến sinh viên ${selectedStudentDetail.studentCode} ngoài hệ thống`)}
                     className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                       <polyline points="22,6 12,13 2,6" />
                     </svg>
-                    <span>Gửi email nhắc nhở</span>
+                    <span>Ghi nhận đã gửi email</span>
                   </button>
 
                   <button
                     type="button"
                     disabled={actionSaving}
-                    onClick={() => handleSaveAction("SCHEDULE_MEETING", `Đã thiết lập lịch hẹn làm việc trực tiếp cùng Cố vấn học tập cho sinh viên ${selectedStudentDetail.studentCode}`)}
+                    onClick={() => handleSaveAction("SCHEDULE_MEETING", `Ghi nhận cán bộ đã thống nhất lịch tư vấn với sinh viên ${selectedStudentDetail.studentCode} ngoài hệ thống`)}
                     className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -703,7 +707,7 @@ export default function AcademicWarningsPage() {
                       <line x1="8" y1="2" x2="8" y2="6" />
                       <line x1="3" y1="10" x2="21" y2="10" />
                     </svg>
-                    <span>Lên lịch hẹn tư vấn</span>
+                    <span>Ghi nhận lịch tư vấn</span>
                   </button>
                 </div>
 
@@ -728,7 +732,7 @@ export default function AcademicWarningsPage() {
                       <div key={act.id} className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="font-bold text-slate-800">
-                            {act.actionType === "MEETING" ? "Gặp trực tiếp" : act.actionType === "NOTIFY_EMAIL" ? "Gửi email" : act.actionType === "SCHEDULE_MEETING" ? "Lên lịch hẹn" : "Tư vấn"}
+                            {act.actionType === "MEETING" ? "Gặp trực tiếp" : act.actionType === "NOTIFY_EMAIL" ? "Đã gửi email (ghi nhận)" : act.actionType === "SCHEDULE_MEETING" ? "Lịch tư vấn (ghi nhận)" : "Tư vấn"}
                           </span>
                           <span className={`px-2 py-0.2 rounded text-[10px] font-bold ${
                             act.status === "RESOLVED" ? "bg-emerald-100 text-emerald-800" : act.status === "ESCALATED" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"
@@ -754,8 +758,8 @@ export default function AcademicWarningsPage() {
       <Modal
         isOpen={showPolicyModal}
         onClose={() => setShowPolicyModal(false)}
-        title="Thiết lập Quy chế Ngưỡng Cảnh báo Học vụ"
-        description="Định nghĩa điểm GPA sàn kích hoạt các mức rủi ro sinh viên"
+        title="Thiết lập Chính sách Ngưỡng Cảnh báo Học vụ"
+        description="Định nghĩa ngưỡng GPA nội bộ để ưu tiên sinh viên cần theo dõi"
         maxWidth="md"
       >
         <form onSubmit={handleCreatePolicy} className="space-y-4">

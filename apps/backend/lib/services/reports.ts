@@ -18,9 +18,147 @@ type WarningStudent = {
   resolvedActions: number;
   academicYear: string | null;
   termCode: string | null;
+  assessed: boolean;
 };
 
 const numberOrNull = (value: unknown) => value == null ? null : Number(value);
+
+type WarningTrendTerm = {
+  id: string;
+  academicYear: string;
+  termCode: string;
+  termOrder: number;
+  label: string;
+};
+
+type WarningTrendSummary = {
+  studentId: string;
+  academicTermId: string;
+  gpa4: unknown;
+  cumulativeGpa4: unknown;
+};
+
+type WarningTrendDecision = {
+  studentId: string;
+  academicTermId: string;
+};
+
+const MIN_REPORTING_TERM_GPA_COVERAGE = 0.8;
+
+export function summarizeWarningTrend(
+  rows: WarningTrendSummary[],
+  termGpaThreshold: number,
+  cumulativeGpaThreshold: number,
+  decisionStudentIds: ReadonlySet<string> = new Set(),
+) {
+  let high = 0;
+  let medium = 0;
+  let evaluated = 0;
+  let available = 0;
+  let termGpaAvailable = 0;
+  let cumulativeGpaAvailable = 0;
+  const summarizedStudentIds = new Set<string>();
+  const summaryByStudent = new Map(rows.map((summary) => [summary.studentId, summary]));
+
+  for (const summary of summaryByStudent.values()) {
+    summarizedStudentIds.add(summary.studentId);
+    const termGpa = numberOrNull(summary.gpa4);
+    const cumulative = numberOrNull(summary.cumulativeGpa4);
+    if (termGpa != null || cumulative != null) available += 1;
+    if (termGpa != null) termGpaAvailable += 1;
+    if (cumulative != null) cumulativeGpaAvailable += 1;
+
+    if (decisionStudentIds.has(summary.studentId)) {
+      high += 1;
+      evaluated += 1;
+    } else if (cumulative != null && cumulative < cumulativeGpaThreshold) {
+      high += 1;
+      evaluated += 1;
+    } else if (termGpa != null && termGpa < termGpaThreshold) {
+      medium += 1;
+      evaluated += 1;
+    } else if (termGpa != null && cumulative != null) {
+      evaluated += 1;
+    }
+  }
+
+  // A source decision is itself a high-severity warning even when that
+  // student does not yet have a GPA summary.
+  for (const studentId of decisionStudentIds) {
+    if (!summarizedStudentIds.has(studentId)) {
+      high += 1;
+      evaluated += 1;
+      available += 1;
+    }
+  }
+
+  return { high, medium, evaluated, available, termGpaAvailable, cumulativeGpaAvailable };
+}
+
+export function selectLatestReportingPeriod<TrendPoint extends { termGpaAvailable: number }>(
+  trend: TrendPoint[],
+  studentCount: number,
+  minimumCoverage = MIN_REPORTING_TERM_GPA_COVERAGE,
+) {
+  if (!trend.length || studentCount <= 0) return null;
+  const sufficientlyCovered = trend.filter(
+    (point) => point.termGpaAvailable / studentCount >= minimumCoverage,
+  );
+  // Prefer a statistically representative term. Small summer terms and a
+  // current term without posted GPA are not suitable as faculty-wide reports.
+  return sufficientlyCovered.at(-1)
+    || trend.filter((point) => point.termGpaAvailable > 0).at(-1)
+    || null;
+}
+
+export function buildWarningTrend(
+  terms: WarningTrendTerm[],
+  summaries: WarningTrendSummary[],
+  decisions: WarningTrendDecision[],
+  termGpaThreshold: number,
+  cumulativeGpaThreshold: number,
+) {
+  const sortedTerms = [...terms].sort((left, right) =>
+    `${left.academicYear}|${String(left.termOrder).padStart(2, "0")}`.localeCompare(
+      `${right.academicYear}|${String(right.termOrder).padStart(2, "0")}`,
+    ),
+  );
+  const summariesByTerm = new Map<string, WarningTrendSummary[]>();
+  const decisionsByTerm = new Map<string, WarningTrendDecision[]>();
+
+  for (const summary of summaries) {
+    const rows = summariesByTerm.get(summary.academicTermId) || [];
+    rows.push(summary);
+    summariesByTerm.set(summary.academicTermId, rows);
+  }
+  for (const decision of decisions) {
+    const rows = decisionsByTerm.get(decision.academicTermId) || [];
+    rows.push(decision);
+    decisionsByTerm.set(decision.academicTermId, rows);
+  }
+
+  return sortedTerms.flatMap((term) => {
+    const periodSummaries = summariesByTerm.get(term.id) || [];
+    const periodDecisions = decisionsByTerm.get(term.id) || [];
+
+    // Every bar represents that exact term. Prior-term warnings are not
+    // carried forward and configured future terms without data are omitted.
+    if (!periodSummaries.length && !periodDecisions.length) return [];
+    return [{
+      academicTermId: term.id,
+      academicYear: term.academicYear,
+      termCode: term.termCode,
+      termOrder: term.termOrder,
+      label: term.label,
+      ...summarizeWarningTrend(
+        periodSummaries,
+        termGpaThreshold,
+        cumulativeGpaThreshold,
+        new Set(periodDecisions.map((decision) => decision.studentId)),
+      ),
+    }];
+  });
+}
 
 export class ReportsService {
   static async academicWarningStudents(
@@ -52,55 +190,28 @@ export class ReportsService {
     ]);
 
     const studentIds = students.map((student) => student.id);
-    const [termSummaries, cumulativeSummaries, warningDecisions, actions] = studentIds.length
+    const [termSummaries, warningDecisions, actions] = studentIds.length
       ? await Promise.all([
           prisma.studentTermSummary.findMany({ where: { studentId: { in: studentIds } } }),
-          prisma.studentCumulativeSummary.findMany({
-            where: { studentId: { in: studentIds } },
-            orderBy: { refreshedAt: "desc" },
-          }),
           prisma.studentDecision.findMany({
             where: { studentId: { in: studentIds }, deletedAt: null, isAcademicWarning: true },
-            select: { studentId: true },
+            select: { studentId: true, academicTermId: true },
           }),
           prisma.warningAction.findMany({
             where: { studentId: { in: studentIds }, status: "RESOLVED" },
             select: { studentId: true },
           }),
         ])
-      : [[], [], [], []];
+      : [[], [], []];
 
     const termMap = new Map(terms.map((term) => [term.id, term]));
     const yearMap = new Map(years.map((year) => [year.id, year]));
     const studentMap = new Map(students.map((student) => [student.id, student]));
-    const summarySortKey = (academicTermId: string) => {
-      const term = termMap.get(academicTermId);
-      const year = term ? yearMap.get(term.academicYearId) : null;
-      return `${year?.sYearCode || ""}|${String(term?.sTermOrder || 0).padStart(2, "0")}`;
-    };
-
-    const latestSummary = new Map<string, (typeof termSummaries)[number]>();
-    const summariesByStudentTerm = new Map<string, (typeof termSummaries)[number]>();
+    const scopedTermSummaries: typeof termSummaries = [];
     for (const summary of termSummaries) {
       const student = studentMap.get(summary.studentId);
       if (student?.sStudyProgramId && summary.sProgramCode !== student.sStudyProgramId) continue;
-      const previous = latestSummary.get(summary.studentId);
-      if (!previous || summarySortKey(summary.academicTermId) > summarySortKey(previous.academicTermId)) {
-        latestSummary.set(summary.studentId, summary);
-      }
-      summariesByStudentTerm.set(`${summary.studentId}|${summary.academicTermId}`, summary);
-    }
-
-    const cumulativeByStudent = new Map<string, (typeof cumulativeSummaries)[number]>();
-    for (const summary of cumulativeSummaries) {
-      const student = studentMap.get(summary.studentId);
-      if (cumulativeByStudent.has(summary.studentId)) continue;
-      if (student?.sStudyProgramId && summary.sProgramCode !== student.sStudyProgramId) continue;
-      cumulativeByStudent.set(summary.studentId, summary);
-    }
-    const decisionCounts = new Map<string, number>();
-    for (const decision of warningDecisions) {
-      decisionCounts.set(decision.studentId, (decisionCounts.get(decision.studentId) || 0) + 1);
+      scopedTermSummaries.push(summary);
     }
     const resolvedCounts = new Map<string, number>();
     for (const action of actions) {
@@ -109,14 +220,47 @@ export class ReportsService {
 
     const termGpaThreshold = Number(policy?.termGpaThreshold ?? 2);
     const cumulativeGpaThreshold = Number(policy?.cumulativeGpaThreshold ?? 2);
+    const completeTrend = buildWarningTrend(
+      terms.map((term) => {
+        const academicYear = yearMap.get(term.academicYearId)?.sYearCode || "";
+        return {
+          id: term.id,
+          academicYear,
+          termCode: term.sTermCode,
+          termOrder: term.sTermOrder,
+          label: `${term.sTermCode} (${academicYear})`,
+        };
+      }),
+      scopedTermSummaries,
+      warningDecisions,
+      termGpaThreshold,
+      cumulativeGpaThreshold,
+    );
+    const latestPeriod = selectLatestReportingPeriod(completeTrend, students.length);
+    const reportingPeriodIndex = latestPeriod
+      ? completeTrend.findIndex((point) => point.academicTermId === latestPeriod.academicTermId)
+      : -1;
+    const trend = (reportingPeriodIndex >= 0 ? completeTrend.slice(0, reportingPeriodIndex + 1) : [])
+      .filter((point) => point.termGpaAvailable > 0)
+      .slice(-5);
+    const latestTerm = latestPeriod ? termMap.get(latestPeriod.academicTermId) : null;
+    const latestYear = latestTerm ? yearMap.get(latestTerm.academicYearId) : null;
+    const periodSummaryByStudent = new Map(
+      scopedTermSummaries
+        .filter((summary) => summary.academicTermId === latestPeriod?.academicTermId)
+        .map((summary) => [summary.studentId, summary]),
+    );
+    const periodDecisionCounts = new Map<string, number>();
+    for (const decision of warningDecisions) {
+      if (decision.academicTermId !== latestPeriod?.academicTermId) continue;
+      periodDecisionCounts.set(decision.studentId, (periodDecisionCounts.get(decision.studentId) || 0) + 1);
+    }
+
     const evaluatedStudents: WarningStudent[] = students.map((student) => {
-      const latest = latestSummary.get(student.id);
-      const cumulative = cumulativeByStudent.get(student.id);
-      const term = latest ? termMap.get(latest.academicTermId) : null;
-      const year = term ? yearMap.get(term.academicYearId) : null;
-      const termGpa4 = numberOrNull(latest?.gpa4);
-      const cumulativeGpa4 = numberOrNull(cumulative?.cumulativeGpa4 ?? latest?.cumulativeGpa4);
-      const decisionCount = decisionCounts.get(student.id) || 0;
+      const summary = periodSummaryByStudent.get(student.id);
+      const termGpa4 = numberOrNull(summary?.gpa4);
+      const cumulativeGpa4 = numberOrNull(summary?.cumulativeGpa4);
+      const decisionCount = periodDecisionCounts.get(student.id) || 0;
       const reasonCodes: string[] = [];
       let severity: WarningLevel = "none";
       if (termGpa4 != null && termGpa4 < termGpaThreshold) {
@@ -131,6 +275,7 @@ export class ReportsService {
         reasonCodes.push("ACADEMIC_WARNING_DECISION");
         severity = "high";
       }
+      const assessed = severity !== "none" || (termGpa4 != null && cumulativeGpa4 != null);
       return {
         studentId: student.id,
         studentCode: student.sStudentId,
@@ -144,8 +289,9 @@ export class ReportsService {
         reasonCount: reasonCodes.length,
         academicWarningDecisions: decisionCount,
         resolvedActions: resolvedCounts.get(student.id) || 0,
-        academicYear: year?.sYearCode || null,
-        termCode: term?.sTermCode || null,
+        academicYear: latestYear?.sYearCode || null,
+        termCode: latestTerm?.sTermCode || null,
+        assessed,
       };
     });
 
@@ -168,34 +314,6 @@ export class ReportsService {
       })
       .filter((item) => item.totalStudents > 0);
 
-    const trend = terms
-      .map((term) => {
-        const year = yearMap.get(term.academicYearId);
-        const rows = [...summariesByStudentTerm.entries()]
-          .filter(([key]) => key.endsWith(`|${term.id}`))
-          .map(([, summary]) => summary);
-        let high = 0;
-        let medium = 0;
-        for (const summary of rows) {
-          const cumulative = numberOrNull(summary.cumulativeGpa4);
-          const termGpa = numberOrNull(summary.gpa4);
-          if (cumulative != null && cumulative < cumulativeGpaThreshold) high += 1;
-          else if (termGpa != null && termGpa < termGpaThreshold) medium += 1;
-        }
-        return {
-          academicYear: year?.sYearCode || "",
-          termCode: term.sTermCode,
-          termOrder: term.sTermOrder,
-          label: `${term.sTermCode} (${year?.sYearCode || ""})`,
-          high,
-          medium,
-          evaluated: rows.length,
-        };
-      })
-      .filter((item) => item.evaluated > 0)
-      .sort((left, right) => `${left.academicYear}|${left.termOrder}`.localeCompare(`${right.academicYear}|${right.termOrder}`))
-      .slice(-5);
-
     const search = filters.search?.trim().toLocaleLowerCase("vi-VN") || "";
     const filtered = warningStudents
       .filter((student) => !filters.severity || student.severity === filters.severity)
@@ -208,9 +326,15 @@ export class ReportsService {
           || left.studentCode.localeCompare(right.studentCode);
       });
     const offset = (page - 1) * pageSize;
-    const evaluated = evaluatedStudents.filter((student) => student.termGpa4 != null || student.cumulativeGpa4 != null).length;
+    const evaluated = evaluatedStudents.filter((student) => student.assessed).length;
+    const available = evaluatedStudents.filter((student) =>
+      student.termGpa4 != null || student.cumulativeGpa4 != null || student.academicWarningDecisions > 0,
+    ).length;
+    const termGpaAvailable = evaluatedStudents.filter((student) => student.termGpa4 != null).length;
+    const cumulativeGpaAvailable = evaluatedStudents.filter((student) => student.cumulativeGpa4 != null).length;
     const high = warningStudents.filter((student) => student.severity === "high").length;
     const medium = warningStudents.filter((student) => student.severity === "medium").length;
+    const safe = evaluatedStudents.filter((student) => student.assessed && student.severity === "none").length;
 
     return {
       items: filtered.slice(offset, offset + pageSize),
@@ -221,10 +345,13 @@ export class ReportsService {
       counts: {
         students: students.length,
         evaluated,
+        available,
+        termGpaAvailable,
+        cumulativeGpaAvailable,
         unassessed: students.length - evaluated,
         high,
         medium,
-        safe: Math.max(0, evaluated - high - medium),
+        safe,
       },
       policy: {
         id: policy?.id || null,
@@ -233,7 +360,7 @@ export class ReportsService {
         cumulativeGpaThreshold,
         configured: Boolean(policy),
       },
-      latestPeriod: trend.at(-1) || null,
+      latestPeriod,
       trend,
       classBreakdown,
     };

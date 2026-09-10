@@ -39,6 +39,7 @@ export const ROLE_PERMISSIONS: Record<Role, string[]> = {
     "progress.calculate",
     "academic_warning.read",
     "academic_warning.calculate",
+    "academic_warning.policy.manage",
     "user.manage",
     "role.manage",
     "advisor_assignment.manage",

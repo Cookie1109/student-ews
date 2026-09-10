@@ -321,7 +321,7 @@ export default function RbacPage() {
     progress: {
       label: "Tiến độ Đào tạo & CTĐT",
       icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4",
-      description: "Khung chương trình, kế hoạch mở môn, dự báo tốt nghiệp",
+      description: "Khung chương trình, kế hoạch mở môn, đánh giá hoàn thành CTĐT",
       color: "text-teal-600 bg-teal-50 border-teal-200",
     },
     academic_warning: {
@@ -756,7 +756,7 @@ export default function RbacPage() {
                             {adv.classCode || adv.classId || adv.class?.classId || "—"}
                           </td>
                           <td className="py-3.5 px-4 text-slate-600">
-                            {adv.termCode || "HK01"} ({adv.academicYear || "2024-2025"})
+                            {adv.termCode || "—"} ({adv.academicYear || "Chưa xác định"})
                           </td>
                           <td className="py-3.5 px-4">
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">

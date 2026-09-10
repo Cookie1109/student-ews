@@ -4,8 +4,10 @@ import { useState, useEffect } from "react";
 import Tabs from "@/components/ui/Tabs";
 import FilterBar from "@/components/ui/FilterBar";
 import SlideOverDrawer from "@/components/ui/SlideOverDrawer";
+import { useAuthStore } from "@/stores/authStore";
 
 export default function TrainingProgressPage() {
+  const { can } = useAuthStore();
   const [activeTab, setActiveTab] = useState<"plans" | "runs">("plans");
   const [loading, setLoading] = useState(true);
   const [plans, setPlans] = useState<any[]>([]);
@@ -45,6 +47,7 @@ export default function TrainingProgressPage() {
   }, []);
 
   const handleLockPlan = async (planId: string) => {
+    if (!can("progress.plan.manage")) return;
     try {
       setActionLoading(true);
       const res = await fetch(`/api/v1/training-progress/plans/${planId}/lock`, { method: "POST" });
@@ -61,6 +64,7 @@ export default function TrainingProgressPage() {
   };
 
   const handleCalculatePlan = async (planId: string) => {
+    if (!can("progress.calculate")) return;
     try {
       setActionLoading(true);
       const res = await fetch(`/api/v1/training-progress/plans/${planId}/calculate`, { method: "POST" });
@@ -177,15 +181,15 @@ export default function TrainingProgressPage() {
                         <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
                           <td className="py-3.5 px-4 font-bold text-slate-900">{p.name || `Kế hoạch ${p.termCode}`}</td>
                           <td className="py-3.5 px-4 text-slate-700">
-                            {p.termCode} ({p.academicYear || "2024-2025"})
+                            {p.termCode || "—"} ({p.academicYear || "Chưa xác định"})
                           </td>
                           <td className="py-3.5 px-4 text-slate-600">
-                            {p.cohortCode || "K45"} • {p.programCode || "CNTT"}
+                            {p.cohortCode || "—"} • {p.programCode || "—"}
                           </td>
                           <td className="py-3.5 px-4 font-mono font-semibold text-blue-600">
-                            {p.offeringCount || 8} môn học
+                            {p.offeringCount ?? 0} môn học
                           </td>
-                          <td className="py-3.5 px-4 font-mono">v{p.version || 1}</td>
+                          <td className="py-3.5 px-4 font-mono">v{p.version ?? 1}</td>
                           <td className="py-3.5 px-4">
                             <span
                               className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
@@ -199,7 +203,7 @@ export default function TrainingProgressPage() {
                           </td>
                           <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-2">
-                              {p.status !== "locked" && (
+                              {p.status !== "locked" && can("progress.plan.manage") && (
                                 <button
                                   type="button"
                                   disabled={actionLoading}
@@ -209,17 +213,19 @@ export default function TrainingProgressPage() {
                                   Khóa KH
                                 </button>
                               )}
-                              <button
-                                type="button"
-                                disabled={actionLoading}
-                                onClick={() => handleCalculatePlan(p.id)}
-                                className="px-3 py-1 text-[11px] font-semibold text-white bg-[var(--color-primary)] hover:opacity-90 rounded-lg transition-opacity flex items-center gap-1 cursor-pointer"
-                              >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                  <polygon points="5 3 19 12 5 21 5 3" />
-                                </svg>
-                                <span>Tính tiến độ</span>
-                              </button>
+                              {can("progress.calculate") && (
+                                <button
+                                  type="button"
+                                  disabled={actionLoading}
+                                  onClick={() => handleCalculatePlan(p.id)}
+                                  className="px-3 py-1 text-[11px] font-semibold text-white bg-[var(--color-primary)] hover:opacity-90 rounded-lg transition-opacity flex items-center gap-1 cursor-pointer"
+                                >
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                    <polygon points="5 3 19 12 5 21 5 3" />
+                                  </svg>
+                                  <span>Tính tiến độ</span>
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -261,10 +267,10 @@ export default function TrainingProgressPage() {
                             {r.startedAt ? new Date(r.startedAt).toLocaleString("vi-VN") : "—"}
                           </td>
                           <td className="py-3.5 px-4 font-semibold text-slate-800">
-                            {r.assessmentTermCode || "HK01"} ({r.assessmentAcademicYear || "2024-2025"})
+                            {r.assessmentTermCode || "—"} ({r.assessmentAcademicYear || "Chưa xác định"})
                           </td>
                           <td className="py-3.5 px-4 text-slate-600">
-                            {r.cohortCode || "K45"} • {r.programCode || "CNTT"}
+                            {r.cohortCode || "—"} • {r.programCode || "—"}
                           </td>
                           <td className="py-3.5 px-4 font-mono font-bold text-slate-900">{r.totalStudents || 0}</td>
                           <td className="py-3.5 px-4">

@@ -273,7 +273,7 @@ export class DashboardService {
     const gradeDistribution = [...gradeGroups].map(([name, count]) => ({
       name,
       count,
-      rate: gpaValues.length ? (count * 100) / gpaValues.length : 0,
+      rate: gpaValues.length ? Number(((count * 100) / gpaValues.length).toFixed(1)) : 0,
     }));
 
     const byCohort = cohorts.map((cohort) => progressPoint(
@@ -422,6 +422,12 @@ export class DashboardService {
           faculty: selectedProgram?.s_faculty_code || "",
         };
       }).sort((a, b) => b.rate - a.rate).slice(0, 5),
+      warningByClass: liveWarningReport.classBreakdown.map((item) => ({
+        classId: item.classCode,
+        className: item.className,
+        red: item.high,
+        yellow: item.medium,
+      })),
       semesterTrend: [],
       updatedAt: sweResponse.generatedAt,
     };

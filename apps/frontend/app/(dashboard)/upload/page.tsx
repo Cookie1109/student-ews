@@ -1,46 +1,64 @@
 "use client";
 
 import { useState } from "react";
+import { useAuthStore } from "@/stores/authStore";
 
 type UploadCategory = "grades" | "students" | "decisions";
 
 const categoryConfig: Record<UploadCategory, {
   label: string;
   endpoint: string;
+  permission: string;
   desc: string;
+  formatHint: string;
+  maxBytes: number;
   sampleFileName: string;
-  sampleData: any[];
+  sampleData: unknown[];
 }> = {
   grades: {
     label: "Kết quả học phần (Điểm)",
     endpoint: "/api/v1/grades/import",
+    permission: "grade.import",
     desc: "Dữ liệu điểm thi học phần, điểm trung bình học kỳ, điểm hệ 4 và hệ 10 để tính toán cảnh báo học vụ",
+    formatHint: "Mảng năm học, mỗi năm gồm danh sách học kỳ và danh sách điểm học phần",
+    maxBytes: 10 * 1024 * 1024,
     sampleFileName: "sample_grades.json",
     sampleData: [
       {
-        studentCode: "2246A001",
-        courseCode: "CT101",
-        academicYear: "2024-2025",
-        termCode: "HK01",
-        score10: 4.5,
-        score4: 1.5,
-        passed: true,
-      },
-      {
-        studentCode: "2246A002",
-        courseCode: "CT102",
-        academicYear: "2024-2025",
-        termCode: "HK01",
-        score10: 3.0,
-        score4: 0.5,
-        passed: false,
+        NamHoc: "2024-2025",
+        DanhSachDiem: [
+          {
+            HocKy: "HK01",
+            DanhSachDiemHK: [
+              {
+                StudentID: "2246A001",
+                StudyProgramID: "7480201",
+                CurriculumID: "CT101",
+                StudyUnitID: "CT101",
+                CurriculumName: "Nhập môn lập trình",
+                Credits: "3",
+                DiemTK_10: "4.5",
+                DiemTK_4: "1.5",
+                DiemTK_Chu: "D",
+                IsPass: "1",
+                TB_HK_10: "6.8",
+                TB_HK_4: "2.4",
+                TB_TL_HK_10: "6.8",
+                TB_TL_HK_4: "2.4"
+              }
+            ]
+          }
+        ]
       },
     ],
   },
   students: {
     label: "Hồ sơ sinh viên",
     endpoint: "/api/v1/students/import",
+    permission: "student.import",
     desc: "Danh sách sinh viên, mã số SV, họ tên, ngày sinh, lớp quản lý và chương trình đào tạo",
+    formatHint: "Mảng hồ sơ sinh viên",
+    maxBytes: 5 * 1024 * 1024,
     sampleFileName: "sample_students.json",
     sampleData: [
       {
@@ -57,7 +75,10 @@ const categoryConfig: Record<UploadCategory, {
   decisions: {
     label: "Quyết định học vụ",
     endpoint: "/api/v1/decisions/import",
+    permission: "decision.import",
     desc: "Quyết định cảnh báo học vụ, thôi học, tạm dừng tiến độ, khen thưởng hoặc kỷ luật từ Ban Đào tạo",
+    formatHint: "Mảng quyết định; yearStudy và termId phải khớp kỳ đã khai báo",
+    maxBytes: 5 * 1024 * 1024,
     sampleFileName: "sample_decisions.json",
     sampleData: [
       {
@@ -66,14 +87,15 @@ const categoryConfig: Record<UploadCategory, {
         decisionName: "Cảnh báo học vụ lần 1",
         decisionTypeId: 16,
         isAcademicWarning: true,
-        academicYear: "2024-2025",
-        termCode: "HK01",
+        yearStudy: "2024-2025",
+        termId: "HK01",
       },
     ],
   },
 };
 
 export default function UploadPage() {
+  const { can } = useAuthStore();
   const [activeCategory, setActiveCategory] = useState<UploadCategory>("grades");
   const [fileContent, setFileContent] = useState("");
   const [fileName, setFileName] = useState("");
@@ -81,32 +103,42 @@ export default function UploadPage() {
   const [importResult, setImportResult] = useState<any | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
-  const currentCfg = categoryConfig[activeCategory];
+  const availableCategories = (Object.entries(categoryConfig) as [UploadCategory, typeof categoryConfig.grades][])
+    .filter(([, config]) => can(config.permission));
+  const effectiveCategory = can(categoryConfig[activeCategory].permission)
+    ? activeCategory
+    : availableCategories[0]?.[0] || activeCategory;
+  const currentCfg = categoryConfig[effectiveCategory];
+
+  const readFile = (file: File) => {
+    if (!file.name.toLowerCase().endsWith(".json")) {
+      alert("Chỉ hỗ trợ file JSON (.json).");
+      return;
+    }
+    if (file.size > currentCfg.maxBytes) {
+      alert(`File vượt quá giới hạn ${currentCfg.maxBytes / 1024 / 1024}MB của loại dữ liệu này.`);
+      return;
+    }
+    setFileName(file.name);
+    setImportResult(null);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setFileContent((event.target?.result as string) || "");
+    };
+    reader.onerror = () => alert("Không thể đọc file. Vui lòng kiểm tra lại file JSON.");
+    reader.readAsText(file, "UTF-8");
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setFileName(file.name);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setFileContent((event.target?.result as string) || "");
-      };
-      reader.readAsText(file);
-    }
+    if (file) readFile(file);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) {
-      setFileName(file.name);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setFileContent((event.target?.result as string) || "");
-      };
-      reader.readAsText(file);
-    }
+    if (file) readFile(file);
   };
 
   const handleLoadSample = () => {
@@ -116,6 +148,10 @@ export default function UploadPage() {
   };
 
   const handleExecuteImport = async () => {
+    if (!can(currentCfg.permission)) {
+      alert("Bạn không có quyền nhập loại dữ liệu này.");
+      return;
+    }
     if (!fileContent.trim()) {
       alert("Vui lòng tải lên file hoặc dán nội dung dữ liệu JSON!");
       return;
@@ -147,7 +183,7 @@ export default function UploadPage() {
       if (res.ok) {
         setImportResult({
           success: true,
-          total: Array.isArray(parsedData) ? parsedData.length : json.total,
+          total: json.total ?? parsedData.length,
           imported: json.imported ?? json.total ?? parsedData.length,
           errors: json.errors || [],
         });
@@ -187,7 +223,7 @@ export default function UploadPage() {
 
       {/* Category Tabs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {(Object.entries(categoryConfig) as [UploadCategory, typeof categoryConfig.grades][]).map(([cat, cfg]) => (
+        {availableCategories.map(([cat, cfg]) => (
           <button
             key={cat}
             type="button"
@@ -198,14 +234,14 @@ export default function UploadPage() {
               setImportResult(null);
             }}
             className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-              activeCategory === cat
+              effectiveCategory === cat
                 ? "border-[var(--color-primary)] bg-[var(--color-primary-light)]/50 shadow-xs ring-1 ring-[var(--color-primary)]"
                 : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/70"
             }`}
           >
             <div className="flex items-center justify-between mb-2">
               <span className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold ${
-                activeCategory === cat ? "bg-[var(--color-primary)] text-white" : "bg-slate-100 text-slate-600"
+                effectiveCategory === cat ? "bg-[var(--color-primary)] text-white" : "bg-slate-100 text-slate-600"
               }`}>
                 {cat === "grades" ? "📝" : cat === "students" ? "👥" : "📜"}
               </span>
@@ -228,7 +264,7 @@ export default function UploadPage() {
             <h3 className="text-sm font-bold text-slate-900" style={{ fontFamily: "Outfit, sans-serif" }}>
               Tải file hoặc Dán nội dung ({currentCfg.label})
             </h3>
-            <p className="text-xs text-slate-400">Hỗ trợ định dạng JSON dạng mảng danh sách bản ghi</p>
+            <p className="text-xs text-slate-400">{currentCfg.formatHint}</p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -269,13 +305,15 @@ export default function UploadPage() {
               chọn từ máy tính
               <input
                 type="file"
-                accept=".json,.txt"
+                accept=".json,application/json"
                 onChange={handleFileChange}
                 className="hidden"
               />
             </label>
           </p>
-          <p className="text-[11px] text-slate-400 mt-1">Dung lượng tối đa 15MB • Tự động giải mã UTF-8</p>
+          <p className="text-[11px] text-slate-400 mt-1">
+            Dung lượng tối đa {currentCfg.maxBytes / 1024 / 1024}MB • Giải mã UTF-8
+          </p>
 
           {fileName && (
             <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-semibold text-slate-700 shadow-xs">
@@ -302,7 +340,7 @@ export default function UploadPage() {
 
           <textarea
             rows={8}
-            placeholder={`[\n  {\n    "studentCode": "2246A001",\n    ...\n  }\n]`}
+            placeholder={JSON.stringify(currentCfg.sampleData, null, 2)}
             value={fileContent}
             onChange={(e) => setFileContent(e.target.value)}
             className="w-full bg-slate-900 text-slate-100 font-mono text-xs rounded-xl p-4 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
@@ -317,7 +355,7 @@ export default function UploadPage() {
 
           <button
             type="button"
-            disabled={uploading || !fileContent.trim()}
+            disabled={uploading || !fileContent.trim() || !can(currentCfg.permission)}
             onClick={handleExecuteImport}
             className="px-6 py-2.5 rounded-xl bg-[var(--color-primary)] hover:opacity-90 disabled:opacity-40 text-white text-xs font-bold shadow-xs transition-all flex items-center gap-2 cursor-pointer"
           >
@@ -348,7 +386,7 @@ export default function UploadPage() {
             importResult.success ? "bg-emerald-50 border-emerald-200 text-emerald-900" : "bg-red-50 border-red-200 text-red-900"
           }`}>
             <div className="font-bold flex items-center gap-2">
-              <span>{importResult.success ? "✓ Nhập dữ liệu thành công!" : "✕ Lỗi nhập dữ liệu"}</span>
+              <span>{importResult.success ? "✓ Đã hoàn tất xử lý nhập dữ liệu" : "✕ Lỗi nhập dữ liệu"}</span>
             </div>
             {importResult.success ? (
               <p>
@@ -360,7 +398,11 @@ export default function UploadPage() {
             {importResult.errors && importResult.errors.length > 0 && (
               <div className="pt-2 border-t border-emerald-200/60 font-mono text-[11px] text-emerald-800 max-h-32 overflow-y-auto">
                 {importResult.errors.map((err: any, i: number) => (
-                  <div key={i}>• {err.studentId || err.studentCode || `Dòng ${i + 1}`}: {err.message}</div>
+                  <div key={i}>
+                    • {typeof err === "string"
+                      ? err
+                      : `${err.studentId || err.studentCode || `Dòng ${i + 1}`}: ${err.message || "Không thể nhập bản ghi"}`}
+                  </div>
                 ))}
               </div>
             )}

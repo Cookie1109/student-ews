@@ -121,8 +121,10 @@ export class FeePoliciesService {
         sYearStudy: data.yearStudy || year?.sYearCode || "",
         sTermId: data.termId || term.sTermCode,
         sFeeObjectDicName: data.policyName || data.feeObjectDicName || "Chính sách học phí",
-        sCoefficient: data.coefficient || "1.0",
-        coefficientPercent: data.reductionPercent !== undefined ? Number(data.reductionPercent) : 50,
+        sCoefficient: String(data.coefficient ?? "1.0"),
+        coefficientPercent: data.reductionPercent !== undefined
+          ? Number(data.reductionPercent)
+          : Math.round(Number(data.coefficient ?? 1) * 100),
         sDecisionNumber: data.decisionNumber || "",
       },
     });

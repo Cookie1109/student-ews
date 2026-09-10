@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAuthStore } from "@/stores/authStore";
 
 export default function SettingsPage() {
+  const canManagePolicy = useAuthStore((state) => state.can("academic_warning.policy.manage"));
   const [policies, setPolicies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -12,12 +14,7 @@ export default function SettingsPage() {
   const [activePolicyId, setActivePolicyId] = useState<string>("");
   const [termGpaThreshold, setTermGpaThreshold] = useState<number>(2.0);
   const [cumulativeGpaThreshold, setCumulativeGpaThreshold] = useState<number>(2.0);
-  const [policyName, setPolicyName] = useState<string>("Quy chế Cảnh báo Học vụ Khoa CNTT");
-
-  // Operational Settings
-  const [notificationEmail, setNotificationEmail] = useState("ctsv.cntt@dlu.edu.vn");
-  const [counselingDeadlineDays, setCounselingDeadlineDays] = useState(7);
-  const [autoEscalateDays, setAutoEscalateDays] = useState(14);
+  const [policyName, setPolicyName] = useState<string>("Chính sách theo dõi học vụ Khoa CNTT");
 
   useEffect(() => {
     async function loadPolicies() {
@@ -31,7 +28,7 @@ export default function SettingsPage() {
           if (items.length > 0) {
             const active = items.find((p: any) => p.status === "active") || items[0];
             setActivePolicyId(active.id);
-            setPolicyName(active.name || active.policyName || "Quy chế Cảnh báo Học vụ");
+            setPolicyName(active.name || active.policyName || "Chính sách Cảnh báo Học vụ");
             setTermGpaThreshold(active.termGpaThreshold ?? 2.0);
             setCumulativeGpaThreshold(active.cumulativeGpaThreshold ?? 2.0);
           }
@@ -47,6 +44,7 @@ export default function SettingsPage() {
 
   const handleSavePolicy = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManagePolicy) return;
     try {
       setSaving(true);
       setSaveSuccess(false);
@@ -95,10 +93,10 @@ export default function SettingsPage() {
           </span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>
-          Cấu hình Quy chế Cảnh báo Sớm
+          Cấu hình Chính sách Cảnh báo Sớm
         </h1>
         <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-          Thiết lập ngưỡng điểm sàn kích hoạt cảnh báo đỏ/vàng, thời hạn xử lý can thiệp và luồng thông báo
+          Thiết lập các ngưỡng GPA nội bộ dùng để ưu tiên sinh viên cần theo dõi
         </p>
       </div>
 
@@ -107,16 +105,16 @@ export default function SettingsPage() {
         <div className="lg:col-span-7 bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-5">
           <div>
             <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider" style={{ fontFamily: "Outfit, sans-serif" }}>
-              Ngưỡng Điểm GPA Cảnh báo Học vụ
+              Ngưỡng GPA Theo dõi Học vụ
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Sinh viên có điểm dưới ngưỡng này sẽ tự động bị gắn cờ rủi ro khi chạy phiên quét học kỳ
+              Sinh viên có điểm dưới ngưỡng sẽ được đưa vào danh sách cần xem xét khi chạy phiên quét
             </p>
           </div>
 
           <form onSubmit={handleSavePolicy} className="space-y-5">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Tên quy chế áp dụng</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Tên chính sách nội bộ</label>
               <input
                 type="text"
                 required
@@ -131,7 +129,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <label className="text-xs font-bold text-red-900 block">Ngưỡng GPA Học kỳ Sàn (Thang 4.0)</label>
-                  <span className="text-[11px] text-red-700">GPA học kỳ &lt; ngưỡng này → Kích hoạt cảnh báo Đỏ/Vàng</span>
+                  <span className="text-[11px] text-red-700">GPA học kỳ &lt; ngưỡng này → Tạo tín hiệu cần theo dõi</span>
                 </div>
                 <span className="font-mono font-black text-lg text-red-600 bg-white border border-red-200 px-3 py-1 rounded-xl shadow-xs">
                   {termGpaThreshold.toFixed(2)}
@@ -148,7 +146,7 @@ export default function SettingsPage() {
               />
               <div className="flex justify-between text-[10px] text-slate-400 font-mono">
                 <span>1.00 (Rất yếu)</span>
-                <span>2.00 (Chuẩn Đại học Đà Lạt)</span>
+                <span>2.00</span>
                 <span>3.00 (Khá)</span>
               </div>
             </div>
@@ -158,7 +156,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <label className="text-xs font-bold text-amber-900 block">Ngưỡng GPA Tích lũy Sàn (Thang 4.0)</label>
-                  <span className="text-[11px] text-amber-700">GPA toàn khóa &lt; ngưỡng này → Cảnh báo nguy cơ thôi học</span>
+                  <span className="text-[11px] text-amber-700">GPA tích lũy &lt; ngưỡng này → Tạo tín hiệu cần theo dõi</span>
                 </div>
                 <span className="font-mono font-black text-lg text-amber-600 bg-white border border-amber-200 px-3 py-1 rounded-xl shadow-xs">
                   {cumulativeGpaThreshold.toFixed(2)}
@@ -175,24 +173,24 @@ export default function SettingsPage() {
               />
               <div className="flex justify-between text-[10px] text-slate-400 font-mono">
                 <span>1.00</span>
-                <span>2.00 (Chuẩn Đại học Đà Lạt)</span>
+                <span>2.00</span>
                 <span>3.00</span>
               </div>
             </div>
 
             {saveSuccess && (
               <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-800 flex items-center gap-2">
-                <span>✓ Đã cập nhật và áp dụng quy chế cảnh báo mới thành công!</span>
+                <span>✓ Đã tạo và áp dụng chính sách cảnh báo mới.</span>
               </div>
             )}
 
             <div className="flex justify-end pt-2">
               <button
                 type="submit"
-                disabled={saving}
+                disabled={saving || !canManagePolicy}
                 className="px-5 py-2.5 rounded-xl bg-[var(--color-primary)] hover:opacity-90 disabled:opacity-50 text-white text-xs font-bold shadow-xs transition-opacity flex items-center gap-2 cursor-pointer"
               >
-                {saving ? "Đang lưu cấu hình..." : "Lưu & Áp dụng Quy chế"}
+                {saving ? "Đang lưu cấu hình..." : canManagePolicy ? "Lưu & Áp dụng Chính sách" : "Không có quyền thay đổi"}
               </button>
             </div>
           </form>
@@ -200,54 +198,21 @@ export default function SettingsPage() {
 
         {/* Right Column: Operational Rules & Policies History */}
         <div className="lg:col-span-5 space-y-6">
-          {/* Operational Workflow Parameters */}
+          {/* Operational workflow status */}
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
             <div>
               <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider" style={{ fontFamily: "Outfit, sans-serif" }}>
-                Quy trình Can thiệp & Thời hạn
+                Phạm vi Can thiệp Hiện tại
               </h2>
-              <p className="text-xs text-slate-400 mt-0.5">Quy định mốc thời gian xử lý và chuyển cấp</p>
+              <p className="text-xs text-slate-400 mt-0.5">Các chức năng đang có trong phiên bản đồ án</p>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Email nhận thông báo sinh viên Đỏ (Khẩn cấp)</label>
-                <input
-                  type="email"
-                  value={notificationEmail}
-                  onChange={(e) => setNotificationEmail(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-800"
-                />
+            <div className="space-y-2 text-xs text-slate-600">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                <strong className="text-emerald-800">Đã hỗ trợ:</strong> ghi nhận nội dung tư vấn, người thực hiện, trạng thái và thời điểm.
               </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Thời hạn CVHT phải gặp sinh viên lần đầu</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="1"
-                    max="30"
-                    value={counselingDeadlineDays}
-                    onChange={(e) => setCounselingDeadlineDays(parseInt(e.target.value) || 7)}
-                    className="w-20 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold font-mono text-slate-800 text-center"
-                  />
-                  <span className="text-slate-500">ngày làm việc kể từ lúc phát cảnh báo</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Tự động Leo thang (Escalate) lên BCN Khoa</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="7"
-                    max="60"
-                    value={autoEscalateDays}
-                    onChange={(e) => setAutoEscalateDays(parseInt(e.target.value) || 14)}
-                    className="w-20 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold font-mono text-slate-800 text-center"
-                  />
-                  <span className="text-slate-500">ngày nếu sinh viên vắng mặt hoặc không tiến bộ</span>
-                </div>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                Email, lịch hẹn, thời hạn và chuyển cấp tự động chưa được tích hợp. Người dùng chỉ ghi nhận các hành động đã thực hiện bên ngoài hệ thống.
               </div>
             </div>
           </div>
@@ -255,7 +220,7 @@ export default function SettingsPage() {
           {/* List of Registered Policies */}
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-3">
             <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider" style={{ fontFamily: "Outfit, sans-serif" }}>
-              Lịch sử các phiên bản quy chế ({policies.length})
+              Lịch sử Chính sách Ngưỡng ({policies.length})
             </h2>
 
             <div className="space-y-2 max-h-48 overflow-y-auto scrollbar-thin">
@@ -264,7 +229,7 @@ export default function SettingsPage() {
                   key={p.id}
                   onClick={() => {
                     setActivePolicyId(p.id);
-                    setPolicyName(p.name || p.policyName || "Quy chế Cảnh báo");
+                    setPolicyName(p.name || p.policyName || "Chính sách Cảnh báo");
                     setTermGpaThreshold(p.termGpaThreshold ?? 2.0);
                     setCumulativeGpaThreshold(p.cumulativeGpaThreshold ?? 2.0);
                   }}

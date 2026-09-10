@@ -247,12 +247,57 @@ export class DecisionsService {
 
   static async importDecisions(items: any[], studentScope: Prisma.StudentWhereInput = {}) {
     const errors: string[] = [];
-    const term = await prisma.academicTerm.findFirst({
-      where: { deletedAt: null },
-      orderBy: [{ isCurrent: "desc" }, { updatedAt: "desc" }],
+    const normalizeTermCode = (value: unknown) => {
+      const code = String(value || "").trim().toUpperCase();
+      if (code === "HK1") return "HK01";
+      if (code === "HK2") return "HK02";
+      if (code === "HK3" || code === "HE") return "HK03";
+      return code;
+    };
+    const requestedPairs = items
+      .map((item) => ({
+        yearCode: String(item?.yearStudy ?? item?.academicYear ?? "").trim(),
+        termCode: normalizeTermCode(item?.termId ?? item?.termCode),
+      }))
+      .filter((item) => item.yearCode && item.termCode);
+    const requestedYearCodes = [...new Set(requestedPairs.map((item) => item.yearCode))];
+    const years = requestedYearCodes.length
+      ? await prisma.academicYear.findMany({
+          where: { sYearCode: { in: requestedYearCodes }, deletedAt: null },
+        })
+      : [];
+    const yearByCode = new Map(years.map((year) => [year.sYearCode, year]));
+
+    const requestedTermCodes = [...new Set(requestedPairs.map((item) => item.termCode))];
+    const requestedYearIds = years.map((year) => year.id);
+    const terms = requestedYearIds.length && requestedTermCodes.length
+      ? await prisma.academicTerm.findMany({
+          where: {
+            academicYearId: { in: requestedYearIds },
+            sTermCode: { in: requestedTermCodes },
+            deletedAt: null,
+          },
+        })
+      : [];
+    const termByKey = new Map(terms.map((term) => [`${term.academicYearId}|${term.sTermCode}`, term]));
+
+    const targetByIndex = new Map<number, { yearId: string; yearCode: string; termId: string; termCode: string }>();
+    items.forEach((item, index) => {
+      const yearCode = String(item?.yearStudy ?? item?.academicYear ?? "").trim();
+      const termCode = normalizeTermCode(item?.termId ?? item?.termCode);
+      if (!yearCode || !termCode) {
+        errors.push(`Row ${index + 1}: yearStudy and termId must be provided together`);
+        return;
+      }
+      const year = yearByCode.get(yearCode);
+      const term = year ? termByKey.get(`${year.id}|${termCode}`) : null;
+      if (!year || !term) {
+        errors.push(`Row ${index + 1}: academic term not found (${yearCode} ${termCode})`);
+        return;
+      }
+      targetByIndex.set(index, { yearId: year.id, yearCode, termId: term.id, termCode });
     });
-    if (!term) throw new Error("No academic term found");
-    const year = await prisma.academicYear.findUnique({ where: { id: term.academicYearId } });
+
     const identifiers = [...new Set(items.map((item) => String(item?.studentId || "").trim()).filter(Boolean))];
     const uuidIds = identifiers.filter(isUUID);
     const students = await prisma.student.findMany({
@@ -266,11 +311,16 @@ export class DecisionsService {
       select: { decisionTypeId: true },
     })).map((type) => type.decisionTypeId));
     const existing = await prisma.studentDecision.findMany({
-      where: { studentId: { in: students.map((student) => student.id) }, academicTermId: term.id, deletedAt: null },
-      select: { studentId: true, decisionTypeId: true, sDecisionNumber: true },
+      where: {
+        studentId: { in: students.map((student) => student.id) },
+        academicTermId: { in: [...new Set([...targetByIndex.values()].map((target) => target.termId))] },
+        deletedAt: null,
+      },
+      select: { studentId: true, academicTermId: true, decisionTypeId: true, sDecisionNumber: true },
     });
-    const naturalKey = (studentId: string, typeId: number, number: string) => `${studentId}|${typeId}|${number.trim()}`;
-    const seen = new Set(existing.map((item) => naturalKey(item.studentId, item.decisionTypeId, item.sDecisionNumber)));
+    const naturalKey = (studentId: string, termId: string, typeId: number, number: string) =>
+      `${studentId}|${termId}|${typeId}|${number.trim()}`;
+    const seen = new Set(existing.map((item) => naturalKey(item.studentId, item.academicTermId, item.decisionTypeId, item.sDecisionNumber)));
     const rows: Prisma.StudentDecisionCreateManyInput[] = [];
 
     items.forEach((item, index) => {
@@ -279,37 +329,48 @@ export class DecisionsService {
       const typeId = Number(item?.decisionTypeId);
       const decisionNumber = String(item?.decisionNumber || "").trim();
       const signDate = item?.signDate ? new Date(item.signDate) : null;
+      const target = targetByIndex.get(index);
+      if (!target) return;
       if (!student) return errors.push(`Row ${index + 1}: student not found (${identifier || "missing studentId"})`);
       if (!validTypes.has(typeId)) return errors.push(`Row ${index + 1}: invalid decisionTypeId`);
+      if (!decisionNumber) return errors.push(`Row ${index + 1}: decisionNumber is required`);
       if (signDate && Number.isNaN(signDate.getTime())) return errors.push(`Row ${index + 1}: invalid signDate`);
-      const key = naturalKey(student.id, typeId, decisionNumber);
+      const key = naturalKey(student.id, target.termId, typeId, decisionNumber);
       if (seen.has(key)) return errors.push(`Row ${index + 1}: duplicate decision skipped`);
       seen.add(key);
       rows.push({
         studentId: student.id,
-        academicYearId: term.academicYearId,
-        academicTermId: term.id,
+        academicYearId: target.yearId,
+        academicTermId: target.termId,
         decisionTypeId: typeId,
         sStudentId: student.sStudentId,
-        sYearStudy: String(item.yearStudy || year?.sYearCode || ""),
-        sTermId: String(item.termId || term.sTermCode),
+        sYearStudy: target.yearCode,
+        sTermId: target.termCode,
         sDecisionNumber: decisionNumber,
         sDecisionName: String(item.decisionName || ""),
         sSignDate: signDate,
         sReason: String(item.reason || ""),
         sFullText: String(item.fullText || ""),
+        isAcademicWarning: item.isAcademicWarning === true
+          || item.isAcademicWarning === 1
+          || ["1", "true", "x"].includes(String(item.isAcademicWarning || "").trim().toLowerCase()),
+        sourcePayload: item,
       });
     });
     let imported = 0;
     if (rows.length) {
       await prisma.$transaction(async (tx) => {
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`decision-import:${term.id}`}))`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('decision-import'))`;
         const concurrentExisting = await tx.studentDecision.findMany({
-          where: { studentId: { in: students.map((student) => student.id) }, academicTermId: term.id, deletedAt: null },
-          select: { studentId: true, decisionTypeId: true, sDecisionNumber: true },
+          where: {
+            studentId: { in: students.map((student) => student.id) },
+            academicTermId: { in: [...new Set(rows.map((row) => row.academicTermId))] },
+            deletedAt: null,
+          },
+          select: { studentId: true, academicTermId: true, decisionTypeId: true, sDecisionNumber: true },
         });
-        const concurrentKeys = new Set(concurrentExisting.map((item) => naturalKey(item.studentId, item.decisionTypeId, item.sDecisionNumber)));
-        const freshRows = rows.filter((row) => !concurrentKeys.has(naturalKey(row.studentId, row.decisionTypeId, row.sDecisionNumber)));
+        const concurrentKeys = new Set(concurrentExisting.map((item) => naturalKey(item.studentId, item.academicTermId, item.decisionTypeId, item.sDecisionNumber)));
+        const freshRows = rows.filter((row) => !concurrentKeys.has(naturalKey(row.studentId, row.academicTermId, row.decisionTypeId, row.sDecisionNumber)));
         if (freshRows.length) await tx.studentDecision.createMany({ data: freshRows });
         imported = freshRows.length;
       });

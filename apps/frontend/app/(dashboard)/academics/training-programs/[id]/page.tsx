@@ -602,7 +602,7 @@ export default function TrainingProgramDetailPage({
                                       {course.theoryHours ?? 45}h / {course.practiceHours ?? 0}h
                                     </td>
                                     <td className="py-3 px-4 text-slate-600">
-                                      {course.departmentCode || "CNTT"}
+                                      {course.departmentCode || "—"}
                                     </td>
                                     <td className="py-3 px-4 text-right space-x-1">
                                       <button
