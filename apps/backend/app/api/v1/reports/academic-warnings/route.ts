@@ -3,6 +3,7 @@ import { ReportsService } from "@/lib/services/reports";
 import { requirePermission } from "@/lib/auth/authorize";
 import { studentScopeWhere } from "@/lib/auth/data-scope";
 import { errorResponse, jsonResponse, parsePagination } from "@/lib/utils/api-response";
+import { apiErrorResponse } from "@/lib/utils/api-error";
 
 export async function GET(req: NextRequest) {
   try {
@@ -17,12 +18,13 @@ export async function GET(req: NextRequest) {
       severity,
       classCode: req.nextUrl.searchParams.get("classCode") || undefined,
       search: req.nextUrl.searchParams.get("search") || undefined,
+      academicTermId: req.nextUrl.searchParams.get("academicTermId") || undefined,
+      academicYearId: req.nextUrl.searchParams.get("academicYearId") || undefined,
       page,
       pageSize,
     }, await studentScopeWhere(auth.actor));
     return jsonResponse(report);
   } catch (error) {
-    console.error("Academic warning report error:", error);
-    return errorResponse("Failed to load academic warning report", "INTERNAL_ERROR", 500);
+    return apiErrorResponse(error, "Failed to load academic warning report");
   }
 }

@@ -18,6 +18,8 @@ import { buildWarningTrend, selectLatestReportingPeriod, summarizeWarningTrend }
 import { POST as loginRoute } from "../app/api/v1/auth/login/route";
 import { POST as refreshRoute } from "../app/api/v1/auth/refresh/route";
 import { signAccessToken } from "../lib/auth/jwt";
+import { assertWarningActionTransition, parseWarningActionStatus } from "../lib/services/warning-actions";
+import { ApiError } from "../lib/utils/api-error";
 
 const IDS = {
   student: "11111111-1111-4111-8111-111111111111",
@@ -35,6 +37,8 @@ test("API permission policy follows the Phase 2 contract", () => {
   assert.equal(requiredPermission("/api/v1/rbac/roles/x/permissions", "PUT"), "role.manage");
   assert.equal(requiredPermission("/api/v1/rbac/advisor-assignments", "POST"), "advisor_assignment.manage");
   assert.equal(requiredPermission("/api/v1/training-progress/completion-runs/preview", "POST"), "progress.calculate");
+  assert.equal(requiredPermission("/api/v1/academic-warnings/actions", "POST"), "academic_warning.action.create");
+  assert.equal(requiredPermission(`/api/v1/academic-warnings/actions/${IDS.plan}`, "PATCH"), "academic_warning.action.update");
 });
 
 function apiOperations(): Set<string> {
@@ -292,6 +296,8 @@ test("warning evaluation promotes high-severity cumulative GPA and decision reas
     programCode: "CNTT",
   };
   const summaries = new Map([[IDS.student, {
+    termSummaryId: IDS.term,
+    cumulativeSummaryId: IDS.courseA,
     registered: 12,
     termGPA4: 1.9,
     termGPA10: 4.8,
@@ -315,6 +321,22 @@ test("warning evaluation promotes high-severity cumulative GPA and decision reas
     "LOW_CUMULATIVE_GPA",
     "ACADEMIC_WARNING_DECISION",
   ]);
+  assert.equal(result.reasons[0].sourceId, IDS.term);
+  assert.equal(result.reasons[1].sourceId, IDS.courseA);
+  assert.equal(result.reasons[1].sourceType, "student_cumulative_summary");
+});
+
+test("warning action state machine accepts workflow paths and rejects invalid jumps", () => {
+  assert.equal(parseWarningActionStatus("OPEN"), "OPEN");
+  assert.doesNotThrow(() => assertWarningActionTransition("OPEN", "IN_PROGRESS"));
+  assert.doesNotThrow(() => assertWarningActionTransition("IN_PROGRESS", "ESCALATED"));
+  assert.doesNotThrow(() => assertWarningActionTransition("ESCALATED", "RESOLVED"));
+  assert.doesNotThrow(() => assertWarningActionTransition("RESOLVED", "REOPENED"));
+  assert.throws(
+    () => assertWarningActionTransition("OPEN", "RESOLVED"),
+    (error: unknown) => error instanceof ApiError && error.code === "INVALID_STATUS_TRANSITION" && error.status === 409,
+  );
+  assert.throws(() => parseWarningActionStatus("CLOSED"), /status must be one of/);
 });
 
 test("warning trend separates conclusively evaluated and partially available data", () => {

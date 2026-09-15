@@ -84,6 +84,10 @@ export function requiredPermission(pathname: string, method: string): string | n
   if (pathname.startsWith("/api/v1/academic-warnings")) {
     if (pathname.includes("/policies") && method !== "GET") return "academic_warning.policy.manage";
     if (pathname.includes("/runs") && method === "POST") return "academic_warning.calculate";
+    if (pathname.includes("/actions") && method === "POST") return "academic_warning.action.create";
+    if (pathname.includes("/actions") && (method === "PATCH" || method === "PUT")) {
+      return "academic_warning.action.update";
+    }
     return "academic_warning.read";
   }
   if (pathname.startsWith("/api/v1/academic-context")) return "progress.read";
@@ -102,6 +106,7 @@ export function hasInvalidUuidSegment(pathname: string): boolean {
     /^\/api\/v1\/training-progress\/completion\/runs\/([^/]+)/,
     /^\/api\/v1\/training-progress\/completion-runs\/([^/]+)/,
     /^\/api\/v1\/academic-warnings\/runs\/([^/]+)/,
+    /^\/api\/v1\/academic-warnings\/actions\/([^/]+)/,
     /^\/api\/v1\/rbac\/(?:users|roles|advisors|advisor-assignments)\/([^/]+)/,
   ];
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

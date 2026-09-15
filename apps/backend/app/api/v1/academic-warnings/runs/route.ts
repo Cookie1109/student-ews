@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
       cohortId: body.cohortId,
       trainingProgramId: body.trainingProgramId,
       assessmentAcademicTermId: body.assessmentAcademicTermId,
+      createdBy: auth.actor.userId,
     });
     return jsonResponse(run, 201);
   } catch (err) {

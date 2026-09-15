@@ -758,8 +758,12 @@ model AcademicWarningRun {
   startedAt                DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
   completedAt              DateTime? @map("completed_at") @db.Timestamptz(6)
   createdBy                String?   @map("created_by") @db.Uuid
+  sourceSnapshot           Json      @default("{}") @map("source_snapshot")
+  sourceSnapshotHash       String?   @map("source_snapshot_hash") @db.VarChar(64)
+  sourceCapturedAt         DateTime? @map("source_captured_at") @db.Timestamptz(6)
 
   @@index([cohortId, trainingProgramId, assessmentAcademicTermId, startedAt(sort: Desc)], map: "academic_warning_runs_scope_idx")
+  @@index([sourceCapturedAt(sort: Desc)], map: "academic_warning_runs_source_captured_idx")
   @@map("academic_warning_runs")
 }
 
@@ -848,15 +852,22 @@ model training_progress_completion_course_results {
 }
 
 model WarningAction {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  studentId  String   @map("student_id") @db.Uuid
-  runId      String?  @map("run_id") @db.Uuid
-  actionType String   @map("action_type") @db.VarChar(64)
-  note       String   @db.Text
-  actorName  String?  @map("actor_name") @db.VarChar(255)
-  status     String   @default("IN_PROGRESS") @db.VarChar(32)
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId      String    @map("student_id") @db.Uuid
+  runId          String?   @map("run_id") @db.Uuid
+  actionType     String    @map("action_type") @db.VarChar(64)
+  note           String    @db.Text
+  actorId        String?   @map("actor_id") @db.Uuid
+  actorName      String?   @map("actor_name") @db.VarChar(255)
+  assignedUserId String?   @map("assigned_user_id") @db.Uuid
+  dueDate        DateTime? @map("due_date") @db.Date
+  resolvedAt     DateTime? @map("resolved_at") @db.Timestamptz(6)
+  status         String    @default("OPEN") @db.VarChar(32)
+  statusHistory  Json      @default("[]") @map("status_history")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@index([studentId, createdAt(sort: Desc)], map: "warning_actions_student_idx")
+  @@index([assignedUserId, status, dueDate], map: "warning_actions_assignee_status_due_idx")
   @@map("warning_actions")
 }

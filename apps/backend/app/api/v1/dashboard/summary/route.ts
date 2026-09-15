@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
 import { DashboardService } from "@/lib/services/dashboard";
-import { jsonResponse, errorResponse, parsePagination } from "@/lib/utils/api-response";
+import { jsonResponse, parsePagination } from "@/lib/utils/api-response";
 import { requireAuth } from "@/lib/auth/authorize";
 import { studentScopeWhere, warningRunScopeWhere } from "@/lib/auth/data-scope";
+import { apiErrorResponse } from "@/lib/utils/api-error";
 
 export async function GET(req: NextRequest) {
   try {
@@ -24,7 +25,6 @@ export async function GET(req: NextRequest) {
     }, await studentScopeWhere(auth.actor), await warningRunScopeWhere(auth.actor));
     return jsonResponse(summary);
   } catch (err) {
-    console.error("Dashboard summary error:", err);
-    return errorResponse("Internal server error", "INTERNAL_ERROR", 500);
+    return apiErrorResponse(err, "Failed to load dashboard summary");
   }
 }

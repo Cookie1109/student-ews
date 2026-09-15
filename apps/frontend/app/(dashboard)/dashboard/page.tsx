@@ -307,6 +307,43 @@ export default function DashboardPage() {
         </select>
       </FilterBar>
 
+      {summaryData?.dataContext && (
+        <section className="grid gap-3 md:grid-cols-3" aria-label="Nguồn và thời điểm dữ liệu dashboard">
+          <div className="rounded-2xl border border-blue-200/80 bg-blue-50/50 px-4 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-700">GPA</p>
+            <p className="mt-1 text-xs font-semibold text-slate-800">
+              {summaryData.dataContext.gpa.periodLabel}
+            </p>
+            <p className="mt-1 text-[11px] leading-4 text-slate-500">
+              {summaryData.dataContext.gpa.availableStudents}/{totalStudents} SV có dữ liệu · {summaryData.dataContext.gpa.aggregation === "median" ? "Trung vị" : "Trung bình"}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-amber-200/80 bg-amber-50/60 px-4 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-700">Cảnh báo live</p>
+            <p className="mt-1 text-xs font-semibold text-slate-800">
+              {summaryData.dataContext.warnings.periodLabel || "Chưa có kỳ đủ dữ liệu"}
+            </p>
+            <p className="mt-1 text-[11px] leading-4 text-slate-500">
+              GPA + quyết định · Policy v{summaryData.dataContext.warnings.policy?.version ?? "—"} · {summaryData.dataContext.warnings.unassessedStudents} SV thiếu dữ liệu
+            </p>
+          </div>
+          <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/50 px-4 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-700">Tiến độ theo run</p>
+            <p className="mt-1 text-xs font-semibold text-slate-800">
+              {summaryData.dataContext.progress.runIds?.length
+                ? `${summaryData.dataContext.progress.runIds.length} snapshot theo phạm vi`
+                : "Chưa có snapshot phù hợp"}
+            </p>
+            <p className="mt-1 text-[11px] leading-4 text-slate-500">
+              Đăng ký + hoàn thành CTĐT
+              {summaryData.dataContext.progress.cutoff
+                ? ` · cutoff ${new Date(summaryData.dataContext.progress.cutoff).toLocaleString("vi-VN")}`
+                : ""}
+            </p>
+          </div>
+        </section>
+      )}
+
       {/* 2. Attention Banner ("Cần chú ý") */}
       <section className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
         <div className="flex items-start gap-3.5">
@@ -402,7 +439,7 @@ export default function DashboardPage() {
 
           {/* Card 5: Đăng ký đúng tiến độ */}
           <div className="bg-white border border-emerald-200/80 rounded-2xl p-4 shadow-xs bg-emerald-50/20 hover:border-emerald-400 transition-all">
-            <span className="text-[11px] font-semibold text-emerald-800 uppercase tracking-wider block">Đáp ứng kế hoạch đăng ký</span>
+            <span className="text-[11px] font-semibold text-emerald-800 uppercase tracking-wider block">Đăng ký đúng tiến độ</span>
             <div className="text-2xl font-bold text-emerald-600 mt-1" style={{ fontFamily: "Outfit, sans-serif" }}>
               {metricPercent(registrationMetric)}
             </div>
@@ -420,7 +457,7 @@ export default function DashboardPage() {
 
           {/* Card 7: Completion estimate */}
           <div className="bg-white border border-blue-200/80 rounded-2xl p-4 shadow-xs bg-blue-50/20 hover:border-blue-400 transition-all">
-            <span className="text-[11px] font-semibold text-blue-800 uppercase tracking-wider block">Ước tính hoàn thành CTĐT</span>
+            <span className="text-[11px] font-semibold text-blue-800 uppercase tracking-wider block">Dự kiến tốt nghiệp đúng hạn</span>
             <div className="text-2xl font-bold text-blue-600 mt-1" style={{ fontFamily: "Outfit, sans-serif" }}>
               {metricPercent(graduationMetric)}
             </div>
@@ -549,22 +586,20 @@ export default function DashboardPage() {
               <button
                 type="button"
                 onClick={() => setCompletionBreakdown("program")}
-                className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
-                  completionBreakdown === "program"
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-500 hover:text-slate-900"
-                }`}
+                className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${completionBreakdown === "program"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-500 hover:text-slate-900"
+                  }`}
               >
                 CTĐT
               </button>
               <button
                 type="button"
                 onClick={() => setCompletionBreakdown("cohort")}
-                className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
-                  completionBreakdown === "cohort"
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-500 hover:text-slate-900"
-                }`}
+                className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${completionBreakdown === "cohort"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-500 hover:text-slate-900"
+                  }`}
               >
                 Khóa
               </button>
@@ -615,22 +650,20 @@ export default function DashboardPage() {
               <button
                 type="button"
                 onClick={() => setRegistrationBreakdown("program")}
-                className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
-                  registrationBreakdown === "program"
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-500 hover:text-slate-900"
-                }`}
+                className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${registrationBreakdown === "program"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-500 hover:text-slate-900"
+                  }`}
               >
                 CTĐT
               </button>
               <button
                 type="button"
                 onClick={() => setRegistrationBreakdown("cohort")}
-                className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
-                  registrationBreakdown === "cohort"
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-500 hover:text-slate-900"
-                }`}
+                className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${registrationBreakdown === "cohort"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-500 hover:text-slate-900"
+                  }`}
               >
                 Khóa
               </button>
@@ -811,24 +844,22 @@ export default function DashboardPage() {
                     <td className="py-3 px-4">
                       <div className="flex flex-col gap-1">
                         <span
-                          className={`inline-flex items-center w-max px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                            st.registrationStatus === "fail"
-                              ? "bg-orange-100 text-orange-800"
-                              : st.registrationStatus === "unassessed"
-                                ? "bg-slate-100 text-slate-600"
+                          className={`inline-flex items-center w-max px-2 py-0.5 rounded-full text-[10px] font-semibold ${st.registrationStatus === "fail"
+                            ? "bg-orange-100 text-orange-800"
+                            : st.registrationStatus === "unassessed"
+                              ? "bg-slate-100 text-slate-600"
                               : "bg-emerald-100 text-emerald-800"
-                          }`}
+                            }`}
                         >
                           {st.registrationStatus === "fail" ? "Chậm đăng ký" : st.registrationStatus === "unassessed" ? "Chưa đánh giá đăng ký" : "Đúng tiến độ"}
                         </span>
                         <span
-                          className={`inline-flex items-center w-max px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                            st.scheduleStatus === "behind_schedule"
-                              ? "bg-red-100 text-red-800"
-                              : st.scheduleStatus === "unassessed"
-                                ? "bg-slate-100 text-slate-600"
+                          className={`inline-flex items-center w-max px-2 py-0.5 rounded-full text-[10px] font-semibold ${st.scheduleStatus === "behind_schedule"
+                            ? "bg-red-100 text-red-800"
+                            : st.scheduleStatus === "unassessed"
+                              ? "bg-slate-100 text-slate-600"
                               : "bg-emerald-100 text-emerald-800"
-                          }`}
+                            }`}
                         >
                           {st.scheduleStatus === "behind_schedule" ? "Chậm CTĐT" : st.scheduleStatus === "unassessed" ? "Chưa đánh giá CTĐT" : "Đúng CTĐT"}
                         </span>
@@ -836,13 +867,12 @@ export default function DashboardPage() {
                     </td>
                     <td className="py-3 px-4">
                       <span
-                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
-                          (st.maxSeverity || st.severity) === "high"
-                            ? "bg-red-100 text-red-700 border border-red-200"
-                            : (st.maxSeverity || st.severity) === "medium"
+                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${(st.maxSeverity || st.severity) === "high"
+                          ? "bg-red-100 text-red-700 border border-red-200"
+                          : (st.maxSeverity || st.severity) === "medium"
                             ? "bg-amber-100 text-amber-800 border border-amber-200"
                             : "bg-emerald-100 text-emerald-800"
-                        }`}
+                          }`}
                       >
                         {(st.maxSeverity || st.severity) === "high" ? "Nguy cơ cao" : "Cần lưu ý"}
                       </span>

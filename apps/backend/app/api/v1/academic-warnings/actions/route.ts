@@ -5,6 +5,7 @@ import { apiErrorResponse, readJsonBody } from "@/lib/utils/api-error";
 import { errorResponse, jsonResponse } from "@/lib/utils/api-response";
 import { studentIdWhere } from "@/lib/utils/is-uuid";
 import { requireStudentPermission, requireWarningRunPermission, studentScopeWhere } from "@/lib/auth/data-scope";
+import { WarningActionsService } from "@/lib/services/warning-actions";
 
 export async function GET(req: NextRequest) {
   try {
@@ -50,7 +51,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = await requirePermission("academic_warning.read", req);
+    const auth = await requirePermission("academic_warning.action.create", req);
     if (!auth.authorized) return auth.response;
     const body = await readJsonBody<{
       studentId?: string;
@@ -58,14 +59,16 @@ export async function POST(req: NextRequest) {
       actionType?: string;
       note?: string;
       status?: string;
+      assignedUserId?: string | null;
+      dueDate?: string | null;
     }>(req);
     if (!body.studentId || !body.actionType || !body.note?.trim()) {
       return errorResponse("studentId, actionType, and note are required", "INVALID_REQUEST", 400);
     }
-    const studentAuth = await requireStudentPermission(req, body.studentId, "academic_warning.read");
+    const studentAuth = await requireStudentPermission(req, body.studentId, "academic_warning.action.create");
     if (!studentAuth.authorized) return studentAuth.response;
     if (body.runId) {
-      const runAuth = await requireWarningRunPermission(req, body.runId, "academic_warning.read");
+      const runAuth = await requireWarningRunPermission(req, body.runId, "academic_warning.action.create");
       if (!runAuth.authorized) return runAuth.response;
     }
     const student = await prisma.student.findFirst({
@@ -80,16 +83,15 @@ export async function POST(req: NextRequest) {
       });
       if (!result) return errorResponse("Student is not part of the warning run", "INVALID_REQUEST", 400);
     }
-    const action = await prisma.warningAction.create({
-      data: {
-        studentId: student.id,
-        runId: body.runId || null,
-        actionType: body.actionType,
-        note: body.note.trim(),
-        actorName: auth.actor.fullName,
-        status: body.status || "IN_PROGRESS",
-      },
-    });
+    const action = await WarningActionsService.create({
+      studentId: student.id,
+      runId: body.runId,
+      actionType: body.actionType,
+      note: body.note,
+      status: body.status,
+      assignedUserId: body.assignedUserId,
+      dueDate: body.dueDate,
+    }, auth.actor);
     return jsonResponse(action, 201);
   } catch (error) {
     return apiErrorResponse(error, "Failed to create warning action");

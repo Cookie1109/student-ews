@@ -67,7 +67,9 @@ npm ci
 3. Chạy `npm run db:generate` để sinh Prisma Client.
 4. Chuẩn bị database theo [hướng dẫn Prisma](apps/backend/prisma/MIGRATIONS.md).
    Database mới cần chạy `npm run db:deploy` sau khi đã tạo database PostgreSQL.
-5. Chạy `npm run dev`, mở http://localhost:3000. Backend chạy tại
+5. Chạy `npm run db:seed` để tạo role, permission, tài khoản khởi tạo và bộ dữ
+   liệu demo tối thiểu.
+6. Chạy `npm run dev`, mở http://localhost:3000. Backend chạy tại
    http://localhost:3001; kiểm tra kết nối database qua `/api/v1/healthz`.
 
 Ví dụ sao chép cấu hình bằng PowerShell, chỉ chạy khi các file đích chưa có:
@@ -83,6 +85,8 @@ Copy-Item apps/frontend/.env.example apps/frontend/.env.local
 | `DATABASE_URL` | Backend | Chuỗi kết nối PostgreSQL |
 | `JWT_SECRET` | Backend | Khóa ký JWT ngẫu nhiên, tối thiểu 32 ký tự |
 | `ALLOWED_ORIGINS` | Backend | Các origin trình duyệt được phép gửi request ghi, cách nhau bằng dấu phẩy |
+| `SEED_ADMIN_USERNAME` / `SEED_ADMIN_PASSWORD` | Seed | Ghi đè tài khoản quản trị khởi tạo |
+| `SEED_ADVISOR_USERNAME` / `SEED_ADVISOR_PASSWORD` | Seed | Ghi đè tài khoản cố vấn demo |
 
 Chỉ các file `.env.example` được đưa vào Git. Giữ khóa JWT, mật khẩu và file
 `.env`/`.env.local` trong môi trường triển khai của bạn.
@@ -94,12 +98,13 @@ nhất quán nếu tồn tại trong cả hai file.
 
 Database hiện có không cần migration chỉ vì thay đổi thư mục. Với database mới
 hoặc triển khai migration, đọc [hướng dẫn Prisma](apps/backend/prisma/MIGRATIONS.md).
-Không có seed script được triển khai trong repository, nên lệnh `db:seed` cũ trỏ
-đến file không tồn tại đã được bỏ.
 
-Repository không cung cấp tài khoản hay mật khẩu mặc định. Khi triển khai mới,
-cần chuẩn bị tài khoản ban đầu, vai trò và quyền trong database qua quy trình
-quản trị được kiểm soát.
+Seed có tính lặp lại an toàn và tạo hai tài khoản phục vụ demo: `admin` /
+`Admin@123456` và `advisor.demo` / `Advisor@123456` nếu không đặt biến môi trường
+ghi đè. Seed đồng thời tạo role/quyền cơ bản, policy cảnh báo có phiên bản, một
+khóa–lớp–CTĐT, ba sinh viên với các mức GPA khác nhau và snapshot tiến độ/cảnh
+báo để có thể demo ngay. Đây chỉ là thông tin khởi tạo cục bộ; triển khai thật
+phải đặt mật khẩu riêng qua biến môi trường và đổi mật khẩu sau lần đăng nhập đầu.
 
 ## Các lệnh thường dùng
 
@@ -117,6 +122,7 @@ quản trị được kiểm soát.
 | `npm run lint` / `npm run lint:backend` | Lint toàn bộ / riêng backend |
 | `npm run db:generate` | Sinh Prisma Client từ schema của backend |
 | `npm run db:deploy` | Áp dụng migration lên database đã cấu hình |
+| `npm run db:seed` | Tạo tài khoản, RBAC, policy và dữ liệu demo tối thiểu |
 
 Các script import dữ liệu nằm ở `apps/backend/scripts`. Chúng giữ nguyên hành vi
 thay thế dữ liệu cũ; không được chạy tự động khi cài đặt, build hay test.

@@ -27,6 +27,7 @@
     "db:migrate": "npm run db:migrate --workspace=@sms/backend",
     "db:deploy": "npm run db:deploy --workspace=@sms/backend",
     "db:push": "npm run db:push --workspace=@sms/backend",
+    "db:seed": "npm run db:seed --workspace=@sms/backend",
     "db:studio": "npm run db:studio --workspace=@sms/backend"
   }
 }

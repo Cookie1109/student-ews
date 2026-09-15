@@ -132,6 +132,10 @@ export default function AcademicWarningsPage() {
 
   const handleSaveAction = async (actionType: string, customNote?: string) => {
     if (!selectedStudentDetail) return;
+    if (!can("academic_warning.action.create")) {
+      alert("Bạn không có quyền tạo hồ sơ hỗ trợ");
+      return;
+    }
     const noteToSave = customNote || interventionNote.trim();
     if (!noteToSave) {
       alert("Vui lòng nhập nội dung ghi chú can thiệp!");
@@ -169,6 +173,49 @@ export default function AcademicWarningsPage() {
       setActionSaving(false);
     }
   };
+
+  const handleUpdateActionStatus = async (actionId: string, status: string) => {
+    if (!selectedStudentDetail) return;
+    try {
+      setActionSaving(true);
+      const res = await fetch(`/api/v1/academic-warnings/actions/${actionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        alert(payload?.error?.message || "Không thể cập nhật trạng thái hỗ trợ");
+        return;
+      }
+      const actRes = await fetch(`/api/v1/academic-warnings/actions?studentId=${selectedStudentDetail.studentId}`);
+      if (actRes.ok) {
+        const actJson = await actRes.json();
+        setExistingActions(actJson.items || actJson || []);
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Lỗi kết nối");
+    } finally {
+      setActionSaving(false);
+    }
+  };
+
+  const nextActionStatuses = (status: string) => ({
+    OPEN: ["IN_PROGRESS", "ESCALATED"],
+    IN_PROGRESS: ["RESOLVED", "ESCALATED"],
+    ESCALATED: ["IN_PROGRESS", "RESOLVED"],
+    RESOLVED: ["REOPENED"],
+    REOPENED: ["IN_PROGRESS", "ESCALATED"],
+  }[status] || []);
+
+  const actionStatusLabel = (status: string) => ({
+    OPEN: "Mở hồ sơ",
+    IN_PROGRESS: "Đang xử lý",
+    RESOLVED: "Đã giải quyết",
+    ESCALATED: "Đã chuyển cấp",
+    REOPENED: "Đã mở lại",
+  }[status] || status);
 
   const handleCreatePolicy = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -684,7 +731,7 @@ export default function AcademicWarningsPage() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    disabled={actionSaving}
+                    disabled={actionSaving || !can("academic_warning.action.create")}
                     onClick={() => handleSaveAction("NOTIFY_EMAIL", `Ghi nhận cán bộ đã gửi email nhắc nhở học vụ đến sinh viên ${selectedStudentDetail.studentCode} ngoài hệ thống`)}
                     className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
@@ -697,7 +744,7 @@ export default function AcademicWarningsPage() {
 
                   <button
                     type="button"
-                    disabled={actionSaving}
+                    disabled={actionSaving || !can("academic_warning.action.create")}
                     onClick={() => handleSaveAction("SCHEDULE_MEETING", `Ghi nhận cán bộ đã thống nhất lịch tư vấn với sinh viên ${selectedStudentDetail.studentCode} ngoài hệ thống`)}
                     className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
@@ -713,7 +760,7 @@ export default function AcademicWarningsPage() {
 
                 <button
                   type="button"
-                  disabled={!interventionNote.trim() || actionSaving}
+                  disabled={!interventionNote.trim() || actionSaving || !can("academic_warning.action.create")}
                   onClick={() => handleSaveAction("COUNSELING")}
                   className="px-4 py-1.5 rounded-xl bg-[var(--color-primary)] hover:opacity-90 disabled:opacity-40 text-white text-xs font-semibold shadow-xs cursor-pointer"
                 >
@@ -737,13 +784,28 @@ export default function AcademicWarningsPage() {
                           <span className={`px-2 py-0.2 rounded text-[10px] font-bold ${
                             act.status === "RESOLVED" ? "bg-emerald-100 text-emerald-800" : act.status === "ESCALATED" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"
                           }`}>
-                            {act.status}
+                            {actionStatusLabel(act.status)}
                           </span>
                         </div>
                         <p className="text-slate-600 text-[11px]">{act.note}</p>
                         <div className="text-[10px] text-slate-400">
                           {act.actorName} • {new Date(act.createdAt).toLocaleString("vi-VN")}
                         </div>
+                        {can("academic_warning.action.update") && nextActionStatuses(act.status).length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 pt-1.5" aria-label={`Chuyển trạng thái từ ${actionStatusLabel(act.status)}`}>
+                            {nextActionStatuses(act.status).map((status) => (
+                              <button
+                                key={status}
+                                type="button"
+                                disabled={actionSaving}
+                                onClick={() => handleUpdateActionStatus(act.id, status)}
+                                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 hover:border-slate-300 hover:text-slate-900 disabled:opacity-50"
+                              >
+                                → {actionStatusLabel(status)}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

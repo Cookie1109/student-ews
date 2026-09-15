@@ -49,25 +49,25 @@
 
 #### 1.1 Chuẩn hóa dữ liệu và cảnh báo
 
-- [ ] **Bổ sung snapshot đầu vào cho `AcademicWarningRun`**: lưu đầy đủ dữ liệu đầu vào (GPA, tổng hợp kỳ, đợt tiến độ/hoàn thành) để tái hiện lịch sử
-- [ ] **Thêm `sourceId` cho reason GPA**: liên kết `LOW_TERM_GPA` và `LOW_CUMULATIVE_GPA` với `StudentTermSummary`/`StudentCumulativeSummary` cụ thể
+- [x] **Bổ sung snapshot đầu vào cho `AcademicWarningRun`**: lưu đầy đủ dữ liệu đầu vào (GPA, tổng hợp kỳ, đợt tiến độ/hoàn thành) để tái hiện lịch sử
+- [x] **Thêm `sourceId` cho reason GPA**: liên kết `LOW_TERM_GPA` và `LOW_CUMULATIVE_GPA` với `StudentTermSummary`/`StudentCumulativeSummary` cụ thể
 - [x] **Xử lý kỳ báo cáo thiếu dữ liệu**: báo cáo chọn kỳ gần nhất đạt độ phủ GPA học kỳ 80%; HK1 2026–2027 đang giữa kỳ không thay thế HK2 2025–2026 trong thống kê
 - [x] **Tách thiếu dữ liệu khỏi không có cảnh báo trên báo cáo**: Xám = chưa đủ dữ liệu kỳ, Xanh = đủ dữ liệu và không có cảnh báo theo điều kiện hiện tại
-- [ ] **Chuẩn hóa ngưỡng báo cáo**: bỏ fallback 2,0 viết trong `reports.ts`, hoặc đưa fallback thành policy mặc định có phiên bản, người kích hoạt và audit
-- [ ] **Ghi rõ/hợp nhất hai chế độ**: báo cáo live dùng GPA/quyết định; cảnh báo theo run dùng đủ 5 nguyên nhân. Dashboard hiện dùng live cho cảnh báo và run cho đăng ký/tiến độ
-- [ ] **Thống nhất bộ lọc dashboard**: mỗi khối phải dùng kỳ đã chọn hoặc hiển thị rõ kỳ/cutoff thực tế của nguồn dữ liệu
+- [x] **Chuẩn hóa ngưỡng báo cáo**: bỏ fallback 2,0 viết trong `reports.ts`, hoặc đưa fallback thành policy mặc định có phiên bản, người kích hoạt và audit
+- [x] **Ghi rõ/hợp nhất hai chế độ**: báo cáo live dùng GPA/quyết định; cảnh báo theo run dùng đủ 5 nguyên nhân. Dashboard hiện dùng live cho cảnh báo và run cho đăng ký/tiến độ
+- [x] **Thống nhất bộ lọc dashboard**: mỗi khối phải dùng kỳ đã chọn hoặc hiển thị rõ kỳ/cutoff thực tế của nguồn dữ liệu
 
 #### 1.2 Hoàn thiện nhật ký hỗ trợ (`WarningAction`)
 
-- [ ] **State machine backend**: `OPEN → IN_PROGRESS → RESOLVED`, thêm `ESCALATED` và `REOPENED`; kiểm soát chuyển trạng thái hợp lệ
-- [ ] **Mở rộng model**: thêm `assignedUserId`, `dueDate`, `resolvedAt`, `statusHistory` (JSON hoặc bảng phụ)
-- [ ] **Quyền ghi riêng**: tách `academic_warning.action.create` / `.update` khỏi `academic_warning.read`
-- [ ] **API cập nhật**: PUT/PATCH cho chuyển trạng thái, validate điều kiện, ghi audit log
+- [x] **State machine backend**: `OPEN → IN_PROGRESS → RESOLVED`, thêm `ESCALATED` và `REOPENED`; kiểm soát chuyển trạng thái hợp lệ
+- [x] **Mở rộng model**: thêm `assignedUserId`, `dueDate`, `resolvedAt`, `statusHistory` (JSON hoặc bảng phụ)
+- [x] **Quyền ghi riêng**: tách `academic_warning.action.create` / `.update` khỏi `academic_warning.read`
+- [x] **API cập nhật**: PUT/PATCH cho chuyển trạng thái, validate điều kiện, ghi audit log
 
 #### 1.3 Seed script và dữ liệu mẫu
 
-- [ ] **Tạo seed script**: tài khoản admin mặc định, role/permission cơ bản, dữ liệu mẫu đủ để demo
-- [ ] **Cập nhật README**: hướng dẫn chạy seed khi triển khai mới
+- [x] **Tạo seed script**: tài khoản admin mặc định, role/permission cơ bản, dữ liệu mẫu đủ để demo
+- [x] **Cập nhật README**: hướng dẫn chạy seed khi triển khai mới
 
 **Sản phẩm giao nộp:** Tài liệu tiến độ lần 1, demo hệ thống với cảnh báo chuẩn hóa, nhật ký hỗ trợ có state machine
 

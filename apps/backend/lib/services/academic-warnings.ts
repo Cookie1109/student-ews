@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import crypto from "crypto";
 import { ApiError } from "@/lib/utils/api-error";
+import { sha256Hex } from "@/lib/utils/crypto";
 
 // ============================================================================
 // Types
@@ -20,7 +21,15 @@ interface StudentSource {
 
 interface ProgressSource { status: string; runId: string }
 interface CompletionSource { scheduleStatus: string; runId: string }
-interface SummarySource { registered: number | null; termGPA4: number | null; termGPA10: number | null; cumulativeGPA4: number | null; cumulativeGPA10: number | null }
+interface SummarySource {
+  termSummaryId: string;
+  cumulativeSummaryId: string | null;
+  registered: number | null;
+  termGPA4: number | null;
+  termGPA10: number | null;
+  cumulativeGPA4: number | null;
+  cumulativeGPA10: number | null;
+}
 interface DecisionSource { id: string; number: string; name: string; fullText: string; signDate: Date | null }
 
 interface ReasonData {
@@ -115,13 +124,15 @@ export function evaluate(
   // Check term GPA
   if (result.termGPA4 != null && result.termGPA4 < policy.termGpaThreshold) {
     addReason("LOW_TERM_GPA", "medium", "GPA học kỳ thấp",
-      { gpa4: result.termGPA4, threshold: policy.termGpaThreshold }, "student_term_summary", null);
+      { gpa4: result.termGPA4, threshold: policy.termGpaThreshold }, "student_term_summary", summary!.termSummaryId);
   }
 
   // Check cumulative GPA
   if (result.cumulativeGPA4 != null && result.cumulativeGPA4 < policy.cumulativeGpaThreshold) {
     addReason("LOW_CUMULATIVE_GPA", "high", "GPA tích lũy thấp",
-      { gpa4: result.cumulativeGPA4, threshold: policy.cumulativeGpaThreshold }, "student_term_summary", null);
+      { gpa4: result.cumulativeGPA4, threshold: policy.cumulativeGpaThreshold },
+      summary!.cumulativeSummaryId ? "student_cumulative_summary" : "student_term_summary",
+      summary!.cumulativeSummaryId || summary!.termSummaryId);
   }
 
   // Check academic warning decisions
@@ -243,14 +254,22 @@ async function loadWarningContext(
   const summaries = new Map<string, SummarySource>();
   if (studentIds.length > 0) {
     const sumRows: any[] = await prisma.$queryRaw`
-      SELECT s.student_id::text, s.registered_credits, s.gpa_4, s.gpa_10, s.cumulative_gpa_4, s.cumulative_gpa_10
+      SELECT s.id::text, s.student_id::text, s.registered_credits, s.gpa_4, s.gpa_10,
+             COALESCE(c.cumulative_gpa_4, s.cumulative_gpa_4) AS cumulative_gpa_4,
+             COALESCE(c.cumulative_gpa_10, s.cumulative_gpa_10) AS cumulative_gpa_10,
+             c.id::text AS cumulative_summary_id
       FROM student_term_summaries s
+      LEFT JOIN student_cumulative_summaries c
+        ON c.student_id = s.student_id AND c.s_program_code = s.s_program_code
+       AND c.source_academic_term_id = s.academic_term_id
       WHERE s.academic_term_id = ${assessmentTermId}::uuid
         AND s.s_program_code = ${program.sProgramCode}
         AND s.student_id = ANY(${studentIds}::uuid[])
     `;
     for (const r of sumRows) {
       summaries.set(r.student_id, {
+        termSummaryId: r.id,
+        cumulativeSummaryId: r.cumulative_summary_id || null,
         registered: r.registered_credits != null ? Number(r.registered_credits) : null,
         termGPA4: r.gpa_4 != null ? Number(r.gpa_4) : null,
         termGPA10: r.gpa_10 != null ? Number(r.gpa_10) : null,
@@ -282,7 +301,36 @@ async function loadWarningContext(
     }
   }
 
-  return { policy, program, completionRunId, progressRunId, students, progress, completion, summaries, decisions };
+  const [progressRunSource, completionRunSource] = await Promise.all([
+    prisma.trainingProgressCalculationRun.findUnique({
+      where: { id: progressRunId },
+      select: { sourceSnapshotHash: true, sourceCapturedAt: true, completedAt: true },
+    }),
+    prisma.trainingProgressCompletionRun.findUnique({
+      where: { id: completionRunId },
+      select: {
+        sourceSnapshotHash: true,
+        sourceCapturedAt: true,
+        completedAt: true,
+        evaluationMode: true,
+        evaluation_scope: true,
+      },
+    }),
+  ]);
+
+  return {
+    policy,
+    program,
+    completionRunId,
+    progressRunId,
+    progressRunSource,
+    completionRunSource,
+    students,
+    progress,
+    completion,
+    summaries,
+    decisions,
+  };
 }
 
 // ============================================================================
@@ -332,6 +380,7 @@ export class AcademicWarningsService {
       cumulativeGpaThreshold: Number(p.cumulativeGpaThreshold),
       version: p.version,
       status: p.status,
+      createdBy: p.createdBy,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
     }));
@@ -342,7 +391,7 @@ export class AcademicWarningsService {
     termGpaThreshold?: number;
     cumulativeGpaThreshold?: number;
     status?: string;
-  }) {
+  }, actorId?: string | null) {
     const name = (data.name || "").trim();
     if (!name) throw new ApiError("Policy name is required", "INVALID_REQUEST", 400);
 
@@ -366,15 +415,31 @@ export class AcademicWarningsService {
         });
       }
       const latest = await tx.academicWarningPolicy.findFirst({ orderBy: { version: "desc" } });
-      return tx.academicWarningPolicy.create({
+      const created = await tx.academicWarningPolicy.create({
         data: {
           name,
           termGpaThreshold: tGpa,
           cumulativeGpaThreshold: cGpa,
           version: (latest?.version || 0) + 1,
           status,
+          createdBy: actorId || null,
         },
       });
+      await tx.auditLog.create({
+        data: {
+          actorId: actorId || null,
+          action: status === "active" ? "warning_policy.activate" : "warning_policy.create",
+          resourceType: "AcademicWarningPolicy",
+          resourceId: created.id,
+          details: {
+            version: created.version,
+            status,
+            termGpaThreshold: tGpa,
+            cumulativeGpaThreshold: cGpa,
+          },
+        },
+      });
+      return created;
     });
   }
 
@@ -450,6 +515,8 @@ export class AcademicWarningsService {
         errorMessage: r.errorMessage,
         startedAt: r.startedAt,
         completedAt: r.completedAt,
+        sourceSnapshotHash: r.sourceSnapshotHash,
+        sourceCapturedAt: r.sourceCapturedAt,
       })),
       total,
       page,
@@ -461,6 +528,7 @@ export class AcademicWarningsService {
     cohortId: string;
     trainingProgramId: string;
     assessmentAcademicTermId: string;
+    createdBy?: string | null;
   }) {
     if (!data.cohortId || !data.trainingProgramId || !data.assessmentAcademicTermId) {
       throw new Error("cohortId, trainingProgramId, and assessmentAcademicTermId are required");
@@ -468,6 +536,54 @@ export class AcademicWarningsService {
 
     // Load all context data
     const ctx = await loadWarningContext(data.cohortId, data.trainingProgramId, data.assessmentAcademicTermId);
+
+    const sourceCapturedAt = new Date();
+    const sourceSnapshot = {
+      schemaVersion: 1,
+      scope: {
+        cohortId: data.cohortId,
+        trainingProgramId: data.trainingProgramId,
+        assessmentAcademicTermId: data.assessmentAcademicTermId,
+      },
+      policy: {
+        id: ctx.policy.id,
+        version: ctx.policy.version,
+        name: ctx.policy.name,
+        termGpaThreshold: Number(ctx.policy.termGpaThreshold),
+        cumulativeGpaThreshold: Number(ctx.policy.cumulativeGpaThreshold),
+      },
+      progressRun: {
+        id: ctx.progressRunId,
+        sourceSnapshotHash: ctx.progressRunSource?.sourceSnapshotHash || null,
+        sourceCapturedAt: ctx.progressRunSource?.sourceCapturedAt?.toISOString() || null,
+        completedAt: ctx.progressRunSource?.completedAt?.toISOString() || null,
+      },
+      completionRun: {
+        id: ctx.completionRunId,
+        sourceSnapshotHash: ctx.completionRunSource?.sourceSnapshotHash || null,
+        sourceCapturedAt: ctx.completionRunSource?.sourceCapturedAt?.toISOString() || null,
+        completedAt: ctx.completionRunSource?.completedAt?.toISOString() || null,
+        evaluationMode: ctx.completionRunSource?.evaluationMode || null,
+        evaluationScope: ctx.completionRunSource?.evaluation_scope || null,
+      },
+      students: ctx.students.map((student) => ({
+        id: student.id,
+        code: student.code,
+        name: student.name,
+        classId: student.classId,
+        classCode: student.classCode,
+        cohortId: student.cohortId,
+        programCode: student.programCode,
+        termSummary: ctx.summaries.get(student.id) || null,
+        progress: ctx.progress.get(student.id) || null,
+        completion: ctx.completion.get(student.id) || null,
+        decisions: (ctx.decisions.get(student.id) || []).map((decision) => ({
+          ...decision,
+          signDate: decision.signDate?.toISOString() || null,
+        })),
+      })),
+    };
+    const sourceSnapshotHash = sha256Hex(JSON.stringify(sourceSnapshot));
 
     // Create the run
     const run = await prisma.academicWarningRun.create({
@@ -479,6 +595,10 @@ export class AcademicWarningsService {
         policyVersion: ctx.policy.version,
         completionRunId: ctx.completionRunId,
         progressRunId: ctx.progressRunId,
+        sourceSnapshot: sourceSnapshot as Prisma.InputJsonValue,
+        sourceSnapshotHash,
+        sourceCapturedAt,
+        createdBy: data.createdBy || null,
         status: "running",
         startedAt: new Date(),
       },
@@ -639,6 +759,9 @@ export class AcademicWarningsService {
       errorMessage: run.errorMessage,
       startedAt: run.startedAt,
       completedAt: run.completedAt,
+      sourceSnapshot: run.sourceSnapshot,
+      sourceSnapshotHash: run.sourceSnapshotHash,
+      sourceCapturedAt: run.sourceCapturedAt,
     };
   }
 

@@ -244,7 +244,7 @@ Chế độ `forecast` có thể giả định học phần đang đăng ký, đ
 
 Mức chung là cao nhất: `none` → Xanh, `medium` → Vàng, `high` → Đỏ. Không tính ARI và không có Cam. Ngưỡng GPA là chính sách theo dõi nội bộ, không tự gán là ngưỡng chính thức của trường.
 
-Reason lưu mã, tiêu đề, mức, `details`, `sourceType`, `sourceId`; run lưu liên kết chính sách và các đợt phụ thuộc. Một số reason GPA chưa có `sourceId`; `AcademicWarningRun` chưa lưu snapshot toàn bộ đầu vào. Cần bổ sung để tái hiện lịch sử đầy đủ.
+Reason lưu mã, tiêu đề, mức, `details`, `sourceType`, `sourceId`; reason GPA liên kết trực tiếp tới `StudentTermSummary` hoặc `StudentCumulativeSummary`. Run lưu snapshot đầu vào, hash SHA-256 và thời điểm chụp, bao gồm policy, nguồn tiến độ/hoàn thành, GPA và quyết định để tái hiện lịch sử.
 
 Thiếu tổng hợp kỳ được ghi vào `dataError`; GPA `null` không kích hoạt so sánh. `maxSeverity=none` có thể đi cùng thiếu dữ liệu: UI/báo cáo phải thể hiện riêng, tránh coi Xanh là đã xác nhận an toàn.
 
@@ -254,9 +254,9 @@ Trang báo cáo hiện không đọc `AcademicWarningStudentResult` để dựng
 
 Kỳ báo cáo được chọn bằng độ phủ GPA học kỳ. Hệ thống ưu tiên kỳ gần nhất có GPA học kỳ của ít nhất 80% sinh viên trong phạm vi (`MIN_REPORTING_TERM_GPA_COVERAGE = 0.8`). Nếu chưa kỳ nào đạt 80%, hệ thống dùng kỳ gần nhất có ít nhất một bản ghi GPA học kỳ; kỳ hoàn toàn chưa có GPA không được chọn. Vì vậy tại thời điểm 10/09/2026, giao diện dùng HK2 năm học 2025–2026 khi đây là kỳ gần nhất đủ độ phủ; HK1 năm học 2026–2027 đang giữa kỳ và còn thiếu dữ liệu không được dùng làm kỳ thống kê. Biểu đồ xu hướng cũng kết thúc ở kỳ báo cáo đã chọn, không đưa kỳ mới thiếu dữ liệu vào sau nó.
 
-Báo cáo dùng ngưỡng của `AcademicWarningPolicy` active có phiên bản nếu tồn tại. Khi chưa có chính sách active, service tạm dùng ngưỡng dự phòng được viết trong mã: GPA học kỳ dưới 2,0 là `medium`/Vàng, GPA tích lũy dưới 2,0 là `high`/Đỏ; quyết định cảnh báo nguồn cũng là Đỏ. Nếu một sinh viên thỏa nhiều điều kiện, Đỏ ưu tiên hơn Vàng. Đây là ngưỡng theo dõi tạm thời, không phải quy định chính thức và cần được đưa hoàn toàn vào chính sách cấu hình trước vận hành.
+Báo cáo bắt buộc dùng `AcademicWarningPolicy` active có phiên bản. Không còn ngưỡng dự phòng viết trong mã; nếu chưa có policy, API trả lỗi cấu hình `WARNING_POLICY_REQUIRED`. Seed tạo policy demo phiên bản 1 cùng người kích hoạt và audit. Nếu một sinh viên thỏa nhiều điều kiện, Đỏ ưu tiên hơn Vàng.
 
-`dashboard.ts` hiện dùng cùng `ReportsService` cho số lượng và danh sách cảnh báo live, nhưng dùng kết quả run gần nhất cho trạng thái đăng ký/tiến độ. Do đó cảnh báo live, tiến độ snapshot và bộ lọc kỳ là các nguồn khác nhau; không được xem chúng là một snapshot duy nhất nếu chưa gắn chung `runId`/kỳ/cutoff.
+`dashboard.ts` dùng cùng `ReportsService` cho số lượng và danh sách cảnh báo live, nhưng dùng kết quả run gần nhất cho trạng thái đăng ký/tiến độ. Khi có bộ lọc kỳ, cả hai nguồn dùng đúng kỳ được chọn; khi không lọc, dashboard neo vào kỳ báo cáo gần nhất đủ độ phủ. Response `dataContext` và giao diện ghi rõ mode, policy, kỳ, run ID và cutoff nên không xem các nguồn là một snapshot duy nhất.
 
 Các việc cần chuẩn hóa:
 
@@ -331,7 +331,7 @@ Chỉ gọi đầu ra là xác suất khi mô hình/kiểm định hỗ trợ di
 
 ## 10. Hỗ trợ và báo cáo
 
-`WarningAction` lưu sinh viên, run tùy chọn, loại hành động, ghi chú, tên người thao tác, trạng thái, ngày tạo. API có GET/POST, mặc định `IN_PROGRESS`. Chưa có state machine backend, thời hạn hay hồ sơ phân công riêng. Ghi chú `RESOLVED` không xác nhận sinh viên hết nguy cơ.
+`WarningAction` lưu sinh viên, run tùy chọn, loại hành động, ghi chú, ID/tên người thao tác, người phụ trách, hạn xử lý, thời điểm hoàn tất, lịch sử trạng thái và thời gian cập nhật. API có GET/POST/PATCH/PUT; bản ghi mới mặc định `OPEN`. Backend kiểm soát `OPEN → IN_PROGRESS → RESOLVED`, chuyển cấp và mở lại, dùng optimistic concurrency và ghi audit. Trạng thái `RESOLVED` chỉ xác nhận hoàn tất hồ sơ hỗ trợ, không xác nhận sinh viên hết nguy cơ.
 
 Đề xuất hồ sơ gắn sinh viên/giai đoạn, người phụ trách, lý do, thời hạn, kết quả, lịch sử trạng thái. Luồng có thể `OPEN → IN_PROGRESS → RESOLVED`, thêm `ESCALATED` và mở lại; cần thống nhất điều kiện rồi kiểm soát ở backend. Lưu ID người thực hiện bên cạnh tên.
 
@@ -353,7 +353,7 @@ Base path `/api/v1`; [api-operations.json](../apps/backend/tests/fixtures/api-op
 | `/students/{id}/fee-policies`, `/fee-policy-types`, `/fee-policies/import` | Chính sách học phí |
 | `/training-progress/plans`, `/training-progress/runs` | Kế hoạch, đăng ký |
 | `/training-progress/completion/runs`, `/training-progress/completion-runs` | Hai nhóm đường dẫn hoàn thành đang có; giữ hợp đồng khi thay đổi |
-| `/academic-warnings/policies`, `/academic-warnings/runs`, `/academic-warnings/actions` | Chính sách, cảnh báo, nhật ký |
+| `/academic-warnings/policies`, `/academic-warnings/runs`, `/academic-warnings/actions` | Chính sách, cảnh báo, nhật ký và chuyển trạng thái hỗ trợ |
 | `/dashboard/summary`, `/students/{id}/dashboard`, `/reports/academic-warnings` | Dashboard, báo cáo |
 | `/rbac/*` | Tài khoản, role, permission, phân công |
 
@@ -361,7 +361,7 @@ Thành công trả payload trực tiếp qua `jsonResponse`; lỗi có `error.co
 
 Backend kiểm tra permission theo hành động, scope theo dữ liệu. Scope có `system`, `all_students`, `faculty`, `assigned_classes`; role `admin` xử lý đặc biệt. Role lưu động trong database, không cố định theo chức danh.
 
-`ClassAdvisorAssignment` gắn người dùng/lớp/kỳ. [data-scope.ts](../apps/backend/lib/auth/data-scope.ts) giới hạn sinh viên, kế hoạch, run, kết quả. Hồ sơ tra phân công active, run thêm ngữ cảnh kỳ; cần rà soát khác biệt khi thiết kế quyền lịch sử. Kiểm tra đọc/xuất ở backend kể cả truy cập trực tiếp ID. API thêm hành động hiện dùng `academic_warning.read`; đích là quyền ghi riêng.
+`ClassAdvisorAssignment` gắn người dùng/lớp/kỳ. [data-scope.ts](../apps/backend/lib/auth/data-scope.ts) giới hạn sinh viên, kế hoạch, run, kết quả. Hồ sơ tra phân công active, run thêm ngữ cảnh kỳ; cần rà soát khác biệt khi thiết kế quyền lịch sử. Kiểm tra đọc/xuất ở backend kể cả truy cập trực tiếp ID. API đọc dùng `academic_warning.read`; tạo/cập nhật hồ sơ hỗ trợ dùng riêng `academic_warning.action.create` và `academic_warning.action.update`, đồng thời giữ kiểm tra scope sinh viên/run.
 
 Access/refresh token dùng HttpOnly cookie, `SameSite=Lax`, `Secure` production, thời hạn cookie 15 phút/30 ngày. Backend kiểm tra Origin ghi qua `ALLOWED_ORIGINS`, giới hạn thử đăng nhập, request ID. Chỉ backend giữ `JWT_SECRET`, `DATABASE_URL`.
 
@@ -371,7 +371,7 @@ Dữ liệu nghiên cứu dùng định danh thay thế, giảm thông tin nhậ
 
 Theo [README](../README.md), cần Node.js từ 20.9, npm, PostgreSQL. Hai ứng dụng build/chạy độc lập, mặc định 3000/3001. Frontend dùng `BACKEND_URL`; backend dùng `DATABASE_URL`, `JWT_SECRET`, `ALLOWED_ORIGINS`; production cần HTTPS.
 
-Áp dụng migration theo [MIGRATIONS.md](../apps/backend/prisma/MIGRATIONS.md). Database có baseline phải đối chiếu/đánh dấu lịch sử đúng, không chạy lại SQL tạo bảng lên dữ liệu hiện có. Chưa có seed tài khoản mặc định. Sao lưu và kiểm thử phục hồi thuộc quy trình triển khai.
+Áp dụng migration theo [MIGRATIONS.md](../apps/backend/prisma/MIGRATIONS.md). Database có baseline phải đối chiếu/đánh dấu lịch sử đúng, không chạy lại SQL tạo bảng lên dữ liệu hiện có. Chạy `npm run db:seed` để tạo tài khoản khởi tạo, RBAC, policy và dữ liệu demo; mật khẩu phải được ghi đè qua biến môi trường khi triển khai thật. Sao lưu và kiểm thử phục hồi thuộc quy trình triển khai.
 
 Đợt tính chạy qua API/service; `running/completed/failed` không đồng nghĩa có worker nền. Khi dữ liệu lớn, đề xuất job xử lý dài, API tạo run/đọc trạng thái, retry và idempotency trước khi đặt lịch tự động.
 
@@ -425,9 +425,9 @@ S2 ghi “08 tháng” và khoảng 09/2026–05/2027; dùng mốc công việc 
 | --- | --- |
 | Hai Next.js app trong npm monorepo | Đã triển khai; build độc lập, giữ `/api/v1` |
 | PostgreSQL/Prisma làm lõi | Đã có; schema/migration là căn cứ vật lý |
-| Run và phiên bản kế hoạch/chính sách | Đã có; cần hoàn thiện snapshot và báo cáo |
+| Run và phiên bản kế hoạch/chính sách | Đã có snapshot, hash, policy và nguồn GPA truy vết được |
 | Chọn kỳ báo cáo theo độ phủ | Đã có; giữ HK2 2025–2026 khi HK1 2026–2027 giữa kỳ chưa đủ dữ liệu |
-| Ngưỡng báo cáo khi thiếu policy | Tạm fallback 2,0 trong mã; cần thay bằng cấu hình có phiên bản/audit |
+| Ngưỡng báo cáo khi thiếu policy | Không fallback; yêu cầu policy active có phiên bản/audit |
 | Xanh/Vàng/Đỏ nội bộ | Đã có `none/medium/high`; thiếu dữ liệu riêng |
 | Giữ rèn luyện/hoạt động trong phạm vi | Yêu cầu S1; hiện đáp ứng một phần |
 | Tách ML khỏi quy tắc/quyết định | Đề xuất đáp ứng bài toán kỳ tiếp theo S2 |

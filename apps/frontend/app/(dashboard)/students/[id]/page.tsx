@@ -8,6 +8,7 @@ import {
 import WarningBadge from "@/components/WarningBadge";
 import SlideOverDrawer from "@/components/ui/SlideOverDrawer";
 import Modal from "@/components/ui/Modal";
+import { useAuthStore } from "@/stores/authStore";
 
 type ActiveTab = "overview" | "grades" | "decisions" | "fee_policies" | "registrations" | "training_plan" | "warnings";
 
@@ -26,6 +27,7 @@ const scheduleLabel = (status?: string | null) => {
 };
 
 export default function StudentDetailPage() {
+  const { can } = useAuthStore();
   const params = useParams();
   const studentId = params?.id as string;
   const router = useRouter();
@@ -1045,13 +1047,15 @@ export default function StudentDetailPage() {
                 </h3>
                 <p className="text-xs text-slate-500">Ghi nhận các buổi tư vấn, gặp gỡ sinh viên và phương án theo dõi</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowActionModal(true)}
-                className="px-3.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer"
-              >
-                <span>+ Thêm buổi tư vấn</span>
-              </button>
+              {can("academic_warning.action.create") && (
+                <button
+                  type="button"
+                  onClick={() => setShowActionModal(true)}
+                  className="px-3.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>+ Thêm buổi tư vấn</span>
+                </button>
+              )}
             </div>
 
             <div className="p-5">

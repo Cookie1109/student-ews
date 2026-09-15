@@ -148,20 +148,30 @@ export class DashboardService {
         where: { academicYearId: selectedYear.id, sTermCode: filters.termCode.toUpperCase(), deletedAt: null },
       });
     }
-    if (!selectedTerm && !filters.academicYear && !filters.termCode) {
-      selectedTerm = await prisma.academicTerm.findFirst({
-        where: { isCurrent: true, deletedAt: null },
-        orderBy: { updatedAt: "desc" },
-      });
-    }
     if (selectedTerm && !selectedYear) {
       selectedYear = await prisma.academicYear.findFirst({ where: { id: selectedTerm.academicYearId, deletedAt: null } });
     }
 
-    const liveWarningReportPromise = ReportsService.academicWarningStudents(
-      { page, pageSize },
+    const hasExplicitTermFilter = Boolean(filters.academicTermId || filters.termCode);
+    const liveWarningReport = await ReportsService.academicWarningStudents(
+      {
+        page,
+        pageSize,
+        academicTermId: hasExplicitTermFilter ? selectedTerm?.id || "__invalid_term__" : undefined,
+        academicYearId: selectedYear?.id,
+      },
       studentWhere,
     );
+    if (!hasExplicitTermFilter && liveWarningReport.latestPeriod) {
+      selectedTerm = await prisma.academicTerm.findFirst({
+        where: { id: liveWarningReport.latestPeriod.academicTermId, deletedAt: null },
+      });
+      if (selectedTerm) {
+        selectedYear = await prisma.academicYear.findFirst({
+          where: { id: selectedTerm.academicYearId, deletedAt: null },
+        });
+      }
+    }
     const directGpaRows = !scopedStudentIds.length
       ? []
       : gpaScope === "term"
@@ -250,8 +260,6 @@ export class DashboardService {
       if (!latestWarningByStudent.has(row.studentId)) latestWarningByStudent.set(row.studentId, row);
     }
     const latestWarnings = [...latestWarningByStudent.values()];
-    const liveWarningReport = await liveWarningReportPromise;
-
     const classCodes = new Set(scopedStudents.map((student) => student.sClassStudentId).filter(Boolean));
     const programCodes = new Set(scopedStudents.map((student) => student.sStudyProgramId).filter(Boolean));
     const classes = allVisibleClasses.filter((item) => classCodes.has(item.classId));
@@ -384,6 +392,33 @@ export class DashboardService {
         total: liveWarningReport.total,
         page,
         pageSize,
+      },
+      dataContext: {
+        gpa: {
+          mode: gpaScope === "term" ? "term_summary" : "latest_cumulative_summary",
+          academicTermId: gpaScope === "term" ? selectedTerm?.id || null : null,
+          periodLabel: gpaScope === "term" && selectedTerm
+            ? `${currentYear?.sYearCode || ""} ${selectedTerm.sTermCode}`.trim()
+            : "Tích lũy mới nhất theo từng sinh viên",
+          aggregation: gpaAggregation,
+          availableStudents: gpaValues.length,
+        },
+        warnings: {
+          ...liveWarningReport.mode,
+          academicTermId: liveWarningReport.latestPeriod?.academicTermId || null,
+          periodLabel: liveWarningReport.latestPeriod?.label || null,
+          policy: liveWarningReport.policy,
+          evaluatedStudents: liveWarningReport.counts.evaluated,
+          unassessedStudents: liveWarningReport.counts.unassessed,
+        },
+        progress: {
+          code: "warning_run_snapshot",
+          label: "Đăng ký và tiến độ từ lần tính cảnh báo theo run",
+          academicTermId: selectedTerm?.id || null,
+          runIds: latestRuns.map((run) => run.id),
+          cutoff: latestRuns[0]?.sourceCapturedAt || latestRuns[0]?.completedAt || null,
+          reasonCodes: ["REGISTRATION_BEHIND", "PROGRAM_PROGRESS_BEHIND"],
+        },
       },
       filterOptions: {
         academicYears: years.map((year) => ({ value: year.sYearCode, label: year.sYearCode })),

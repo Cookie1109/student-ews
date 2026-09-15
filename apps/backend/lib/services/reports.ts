@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { ApiError } from "@/lib/utils/api-error";
 
 type WarningLevel = "high" | "medium" | "none";
 
@@ -162,7 +163,15 @@ export function buildWarningTrend(
 
 export class ReportsService {
   static async academicWarningStudents(
-    filters: { severity?: string; classCode?: string; search?: string; page?: number; pageSize?: number } = {},
+    filters: {
+      severity?: string;
+      classCode?: string;
+      search?: string;
+      academicTermId?: string;
+      academicYearId?: string;
+      page?: number;
+      pageSize?: number;
+    } = {},
     studentScope: Prisma.StudentWhereInput = {},
   ) {
     const page = Math.max(1, filters.page || 1);
@@ -190,11 +199,32 @@ export class ReportsService {
     ]);
 
     const studentIds = students.map((student) => student.id);
+    if (!policy) {
+      throw new ApiError(
+        "No active academic warning policy is configured. Activate a versioned policy before viewing reports.",
+        "WARNING_POLICY_REQUIRED",
+        503,
+      );
+    }
+    const reportTerms = filters.academicYearId
+      ? terms.filter((term) => term.academicYearId === filters.academicYearId)
+      : terms;
+    const reportTermIds = reportTerms.map((term) => term.id);
     const [termSummaries, warningDecisions, actions] = studentIds.length
       ? await Promise.all([
-          prisma.studentTermSummary.findMany({ where: { studentId: { in: studentIds } } }),
+          prisma.studentTermSummary.findMany({
+            where: {
+              studentId: { in: studentIds },
+              ...(filters.academicYearId ? { academicTermId: { in: reportTermIds } } : {}),
+            },
+          }),
           prisma.studentDecision.findMany({
-            where: { studentId: { in: studentIds }, deletedAt: null, isAcademicWarning: true },
+            where: {
+              studentId: { in: studentIds },
+              deletedAt: null,
+              isAcademicWarning: true,
+              ...(filters.academicYearId ? { academicTermId: { in: reportTermIds } } : {}),
+            },
             select: { studentId: true, academicTermId: true },
           }),
           prisma.warningAction.findMany({
@@ -218,10 +248,10 @@ export class ReportsService {
       resolvedCounts.set(action.studentId, (resolvedCounts.get(action.studentId) || 0) + 1);
     }
 
-    const termGpaThreshold = Number(policy?.termGpaThreshold ?? 2);
-    const cumulativeGpaThreshold = Number(policy?.cumulativeGpaThreshold ?? 2);
+    const termGpaThreshold = Number(policy.termGpaThreshold);
+    const cumulativeGpaThreshold = Number(policy.cumulativeGpaThreshold);
     const completeTrend = buildWarningTrend(
-      terms.map((term) => {
+      reportTerms.map((term) => {
         const academicYear = yearMap.get(term.academicYearId)?.sYearCode || "";
         return {
           id: term.id,
@@ -236,7 +266,28 @@ export class ReportsService {
       termGpaThreshold,
       cumulativeGpaThreshold,
     );
-    const latestPeriod = selectLatestReportingPeriod(completeTrend, students.length);
+    const requestedTerm = filters.academicTermId ? termMap.get(filters.academicTermId) : null;
+    if (filters.academicTermId && !requestedTerm) {
+      throw new ApiError("Academic term not found", "INVALID_ACADEMIC_TERM", 400);
+    }
+    if (requestedTerm && filters.academicYearId && requestedTerm.academicYearId !== filters.academicYearId) {
+      throw new ApiError("Academic term does not belong to the selected academic year", "INVALID_ACADEMIC_TERM", 400);
+    }
+    const latestPeriod = requestedTerm
+      ? completeTrend.find((point) => point.academicTermId === requestedTerm.id) || {
+          academicTermId: requestedTerm.id,
+          academicYear: yearMap.get(requestedTerm.academicYearId)?.sYearCode || "",
+          termCode: requestedTerm.sTermCode,
+          termOrder: requestedTerm.sTermOrder,
+          label: `${requestedTerm.sTermCode} (${yearMap.get(requestedTerm.academicYearId)?.sYearCode || ""})`,
+          high: 0,
+          medium: 0,
+          evaluated: 0,
+          available: 0,
+          termGpaAvailable: 0,
+          cumulativeGpaAvailable: 0,
+        }
+      : selectLatestReportingPeriod(completeTrend, students.length);
     const reportingPeriodIndex = latestPeriod
       ? completeTrend.findIndex((point) => point.academicTermId === latestPeriod.academicTermId)
       : -1;
@@ -354,11 +405,22 @@ export class ReportsService {
         safe,
       },
       policy: {
-        id: policy?.id || null,
-        name: policy?.name || "Ngưỡng cảnh báo mặc định",
+        id: policy.id,
+        name: policy.name,
+        version: policy.version,
+        status: policy.status,
+        activatedBy: policy.createdBy,
         termGpaThreshold,
         cumulativeGpaThreshold,
-        configured: Boolean(policy),
+        configured: true,
+      },
+      mode: {
+        code: "live_gpa_decision",
+        label: "Cảnh báo live theo GPA và quyết định",
+        reasonCodes: ["LOW_TERM_GPA", "LOW_CUMULATIVE_GPA", "ACADEMIC_WARNING_DECISION"],
+        excludes: ["REGISTRATION_BEHIND", "PROGRAM_PROGRESS_BEHIND"],
+        periodSelection: requestedTerm ? "explicit_filter" : "latest_term_with_80_percent_term_gpa_coverage",
+        generatedAt: new Date().toISOString(),
       },
       latestPeriod,
       trend,
