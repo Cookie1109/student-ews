@@ -62,6 +62,12 @@ const Icons = {
       <line x1="12" y1="17" x2="12.01" y2="17" />
     </svg>
   ),
+  activities: (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22c4.4 0 8-3.1 8-7 0-3-2-5-5-6 .4-3-1-6-4-7 0 3-2 5-4 7-2 2-3 4-3 6 0 3.9 3.6 7 8 7z" />
+      <path d="M9 18c0-2 1-3 3-5 0 2 2 3 2 5a2.5 2.5 0 0 1-5 0z" />
+    </svg>
+  ),
   rbac: (
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
@@ -150,6 +156,13 @@ const coreNavItems: NavItem[] = [
     label: "Cảnh báo học tập",
     icon: Icons.warnings,
     permission: "academic_warning.read",
+  },
+  {
+    id: "activities",
+    href: "/activities",
+    label: "Hoạt động",
+    icon: Icons.activities,
+    permission: "activity.read",
   },
   {
     id: "reports",

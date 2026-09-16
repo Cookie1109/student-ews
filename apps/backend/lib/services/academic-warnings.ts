@@ -31,6 +31,7 @@ interface SummarySource {
   cumulativeGPA10: number | null;
 }
 interface DecisionSource { id: string; number: string; name: string; fullText: string; signDate: Date | null }
+interface ConductSource { id: string; score: number; statusId: string }
 
 interface ReasonData {
   reasonCode: string;
@@ -66,7 +67,8 @@ export function evaluate(
   completion: Map<string, CompletionSource>,
   summaries: Map<string, SummarySource>,
   decisions: Map<string, DecisionSource[]>,
-  policy: { termGpaThreshold: number; cumulativeGpaThreshold: number },
+  policy: { termGpaThreshold: number; cumulativeGpaThreshold: number; conductScoreThreshold?: number },
+  conduct: Map<string, ConductSource> = new Map(),
 ): EvalResult {
   const result: EvalResult = {
     termRegisteredCredits: null,
@@ -133,6 +135,18 @@ export function evaluate(
       { gpa4: result.cumulativeGPA4, threshold: policy.cumulativeGpaThreshold },
       summary!.cumulativeSummaryId ? "student_cumulative_summary" : "student_term_summary",
       summary!.cumulativeSummaryId || summary!.termSummaryId);
+  }
+
+  const conductRecord = conduct.get(student.id);
+  if (
+    conductRecord &&
+    conductRecord.statusId === "1" &&
+    policy.conductScoreThreshold != null &&
+    conductRecord.score < policy.conductScoreThreshold
+  ) {
+    addReason("LOW_CONDUCT_SCORE", "medium", "Điểm rèn luyện dưới ngưỡng theo dõi",
+      { score: conductRecord.score, threshold: policy.conductScoreThreshold, approvalStatus: "approved" },
+      "student_conduct_record", conductRecord.id);
   }
 
   // Check academic warning decisions
@@ -301,6 +315,20 @@ async function loadWarningContext(
     }
   }
 
+  const conduct = new Map<string, ConductSource>();
+  if (studentIds.length > 0) {
+    const conductRows: Array<{ id: string; student_id: string; last_score: unknown; status_id: string }> = await prisma.$queryRaw`
+      SELECT id::text, student_id::text, last_score, status_id
+      FROM student_conduct_records
+      WHERE academic_term_id = ${assessmentTermId}::uuid
+        AND student_id = ANY(${studentIds}::uuid[])
+        AND status_id = '1' AND last_score IS NOT NULL
+    `;
+    for (const row of conductRows) {
+      conduct.set(row.student_id, { id: row.id, score: Number(row.last_score), statusId: row.status_id });
+    }
+  }
+
   const [progressRunSource, completionRunSource] = await Promise.all([
     prisma.trainingProgressCalculationRun.findUnique({
       where: { id: progressRunId },
@@ -330,6 +358,7 @@ async function loadWarningContext(
     completion,
     summaries,
     decisions,
+    conduct,
   };
 }
 
@@ -378,6 +407,7 @@ export class AcademicWarningsService {
       name: p.name,
       termGpaThreshold: Number(p.termGpaThreshold),
       cumulativeGpaThreshold: Number(p.cumulativeGpaThreshold),
+      conductScoreThreshold: Number(p.conductScoreThreshold),
       version: p.version,
       status: p.status,
       createdBy: p.createdBy,
@@ -390,6 +420,7 @@ export class AcademicWarningsService {
     name: string;
     termGpaThreshold?: number;
     cumulativeGpaThreshold?: number;
+    conductScoreThreshold?: number;
     status?: string;
   }, actorId?: string | null) {
     const name = (data.name || "").trim();
@@ -397,8 +428,12 @@ export class AcademicWarningsService {
 
     const tGpa = data.termGpaThreshold ?? 2.0;
     const cGpa = data.cumulativeGpaThreshold ?? 2.0;
+    const conductScore = data.conductScoreThreshold ?? 50;
     if (tGpa < 0 || tGpa > 4 || cGpa < 0 || cGpa > 4) {
       throw new ApiError("GPA thresholds must be between 0 and 4", "INVALID_THRESHOLD", 400);
+    }
+    if (conductScore < 0 || conductScore > 100) {
+      throw new ApiError("Conduct score threshold must be between 0 and 100", "INVALID_THRESHOLD", 400);
     }
 
     const status = data.status || "active";
@@ -420,6 +455,7 @@ export class AcademicWarningsService {
           name,
           termGpaThreshold: tGpa,
           cumulativeGpaThreshold: cGpa,
+          conductScoreThreshold: conductScore,
           version: (latest?.version || 0) + 1,
           status,
           createdBy: actorId || null,
@@ -436,6 +472,7 @@ export class AcademicWarningsService {
             status,
             termGpaThreshold: tGpa,
             cumulativeGpaThreshold: cGpa,
+            conductScoreThreshold: conductScore,
           },
         },
       });
@@ -551,6 +588,7 @@ export class AcademicWarningsService {
         name: ctx.policy.name,
         termGpaThreshold: Number(ctx.policy.termGpaThreshold),
         cumulativeGpaThreshold: Number(ctx.policy.cumulativeGpaThreshold),
+        conductScoreThreshold: Number(ctx.policy.conductScoreThreshold),
       },
       progressRun: {
         id: ctx.progressRunId,
@@ -581,6 +619,7 @@ export class AcademicWarningsService {
           ...decision,
           signDate: decision.signDate?.toISOString() || null,
         })),
+        conduct: ctx.conduct.get(student.id) || null,
       })),
     };
     const sourceSnapshotHash = sha256Hex(JSON.stringify(sourceSnapshot));
@@ -612,7 +651,12 @@ export class AcademicWarningsService {
     for (const student of ctx.students) {
       const evalResult = evaluate(
         student, ctx.progress, ctx.completion, ctx.summaries, ctx.decisions,
-        { termGpaThreshold: Number(ctx.policy.termGpaThreshold), cumulativeGpaThreshold: Number(ctx.policy.cumulativeGpaThreshold) },
+        {
+          termGpaThreshold: Number(ctx.policy.termGpaThreshold),
+          cumulativeGpaThreshold: Number(ctx.policy.cumulativeGpaThreshold),
+          conductScoreThreshold: Number(ctx.policy.conductScoreThreshold),
+        },
+        ctx.conduct,
       );
 
       const studentResultId = crypto.randomUUID();
@@ -748,7 +792,14 @@ export class AcademicWarningsService {
       programCode: program?.sProgramCode,
       assessmentAcademicTermId: run.assessmentAcademicTermId,
       termCode: term?.sTermCode,
-      policy: policy ? { id: policy.id, name: policy.name, version: policy.version, termGpaThreshold: Number(policy.termGpaThreshold), cumulativeGpaThreshold: Number(policy.cumulativeGpaThreshold) } : null,
+      policy: policy ? {
+        id: policy.id,
+        name: policy.name,
+        version: policy.version,
+        termGpaThreshold: Number(policy.termGpaThreshold),
+        cumulativeGpaThreshold: Number(policy.cumulativeGpaThreshold),
+        conductScoreThreshold: Number(policy.conductScoreThreshold),
+      } : null,
       completionRunId: run.completionRunId,
       progressRunId: run.progressRunId,
       status: run.status,

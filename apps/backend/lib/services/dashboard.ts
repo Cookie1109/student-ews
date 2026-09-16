@@ -14,6 +14,8 @@ interface DashboardFilters {
   cohortId?: string;
   trainingProgramId?: string;
   academicTermId?: string;
+  warningLevel?: string;
+  supportStatus?: string;
 }
 
 type WarningSnapshot = {
@@ -121,6 +123,24 @@ export class DashboardService {
           },
         })
       : null;
+    const supportConditions: Prisma.StudentWhereInput[] = [];
+    if (filters.supportStatus) {
+      const actions = await prisma.warningAction.findMany({
+        orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+        select: { studentId: true, status: true },
+      });
+      const latestByStudent = new Map<string, string>();
+      for (const action of actions) {
+        if (!latestByStudent.has(action.studentId)) latestByStudent.set(action.studentId, action.status);
+      }
+      if (filters.supportStatus === "NONE") {
+        supportConditions.push({ id: { notIn: [...latestByStudent.keys()] } });
+      } else {
+        supportConditions.push({ id: { in: [...latestByStudent]
+          .filter(([, status]) => status === filters.supportStatus)
+          .map(([studentId]) => studentId) } });
+      }
+    }
     const studentWhere: Prisma.StudentWhereInput = {
       AND: [
         { deletedAt: null },
@@ -129,6 +149,7 @@ export class DashboardService {
           ? [{ sStudyProgramId: selectedProgram ? selectedProgram.sProgramCode : { in: [] } }]
           : []),
         ...(filteredClasses ? [{ sClassStudentId: { in: filteredClasses.map((item) => item.classId) } }] : []),
+        ...supportConditions,
       ],
     };
     const scopedStudents = await prisma.student.findMany({
@@ -159,6 +180,7 @@ export class DashboardService {
         pageSize,
         academicTermId: hasExplicitTermFilter ? selectedTerm?.id || "__invalid_term__" : undefined,
         academicYearId: selectedYear?.id,
+        severity: filters.warningLevel,
       },
       studentWhere,
     );
@@ -199,6 +221,91 @@ export class DashboardService {
       const value = decimalNumber(row.value);
       if (value !== null) directGpaByStudent.set(row.studentId, value);
     }
+
+    const conductRows = selectedTerm && scopedStudentIds.length
+      ? await prisma.studentConductRecord.findMany({
+          where: { studentId: { in: scopedStudentIds }, academicTermId: selectedTerm.id },
+          select: { id: true, studentId: true, sClassStudentId: true, statusId: true, lastScore: true },
+        })
+      : [];
+    const approvedConduct = conductRows.flatMap((row) =>
+      row.statusId === "1" && row.lastScore != null
+        ? [{ ...row, score: Number(row.lastScore) }]
+        : [],
+    );
+    const conductValues = approvedConduct.map((row) => row.score);
+    const conductGroups = [
+      { name: "Xuất sắc", min: 90, max: 101 },
+      { name: "Tốt", min: 80, max: 90 },
+      { name: "Khá", min: 65, max: 80 },
+      { name: "Trung bình", min: 50, max: 65 },
+      { name: "Yếu", min: 35, max: 50 },
+      { name: "Kém", min: 0, max: 35 },
+    ].map((group) => ({
+      name: group.name,
+      count: conductValues.filter((score) => score >= group.min && score < group.max).length,
+    }));
+
+    const periodActivities = selectedTerm
+      ? await prisma.activity.findMany({
+          where: { OR: [{ academicTermId: selectedTerm.id }, { conductTermId: selectedTerm.id }] },
+          select: { id: true },
+        })
+      : [];
+    const activityParticipations = periodActivities.length && scopedStudentIds.length
+      ? await prisma.activityParticipation.findMany({
+          where: { activityId: { in: periodActivities.map((activity) => activity.id) }, studentId: { in: scopedStudentIds } },
+          select: { studentId: true, status: true },
+        })
+      : [];
+    const activityStudentIds = new Set(activityParticipations.map((row) => row.studentId));
+
+    const gpaHistoryRows: Array<{
+      student_id: string;
+      academic_term_id: string;
+      s_program_code: string;
+      gpa_4: unknown;
+      s_year_code: string;
+      s_term_code: string;
+      s_term_order: number;
+    }> = scopedStudentIds.length ? await prisma.$queryRaw`
+      SELECT s.student_id::text, s.academic_term_id::text, s.s_program_code, s.gpa_4,
+             y.s_year_code, t.s_term_code, t.s_term_order
+      FROM student_term_summaries s
+      JOIN academic_terms t ON t.id = s.academic_term_id
+      JOIN academic_years y ON y.id = t.academic_year_id
+      WHERE s.student_id = ANY(${scopedStudentIds}::uuid[]) AND s.gpa_4 IS NOT NULL
+      ORDER BY y.s_year_code, t.s_term_order
+    ` : [];
+    const trendGroups = new Map<string, { label: string; academicYear: string; termCode: string; order: string; values: number[] }>();
+    for (const row of gpaHistoryRows) {
+      const student = scopedStudentMap.get(row.student_id);
+      if (student?.sStudyProgramId && row.s_program_code !== student.sStudyProgramId) continue;
+      const key = row.academic_term_id;
+      const group = trendGroups.get(key) || {
+        label: `${row.s_term_code} ${row.s_year_code}`,
+        academicYear: row.s_year_code,
+        termCode: row.s_term_code,
+        order: `${row.s_year_code}|${String(row.s_term_order).padStart(2, "0")}`,
+        values: [],
+      };
+      group.values.push(Number(row.gpa_4));
+      trendGroups.set(key, group);
+    }
+    const selectedOrder = selectedTerm && selectedYear
+      ? `${selectedYear.sYearCode}|${String(selectedTerm.sTermOrder).padStart(2, "0")}`
+      : null;
+    const gpaTrend = [...trendGroups.values()]
+      .filter((group) => !selectedOrder || group.order <= selectedOrder)
+      .sort((left, right) => left.order.localeCompare(right.order))
+      .slice(-8)
+      .map((group) => ({
+        label: group.label,
+        academicYear: group.academicYear,
+        termCode: group.termCode,
+        average: group.values.reduce((sum, value) => sum + value, 0) / group.values.length,
+        count: group.values.length,
+      }));
 
     const warningFilter: Prisma.AcademicWarningRunWhereInput = {
       status: "completed",
@@ -340,6 +447,8 @@ export class DashboardService {
         ...(selectedTerm ? { termCode: selectedTerm.sTermCode } : {}),
         ...(selectedProgram ? { programCode: selectedProgram.sProgramCode } : {}),
         ...(filters.classId ? { classId: filters.classId } : {}),
+        ...(filters.warningLevel ? { warningLevel: filters.warningLevel } : {}),
+        ...(filters.supportStatus ? { supportStatus: filters.supportStatus } : {}),
         gpaScope,
         gpaAggregation,
       },
@@ -351,20 +460,28 @@ export class DashboardService {
         registrationRate: percentage(registrationAll.pass, registrationAll.total),
         warningStudents: availableMetric(warningStudents, warningStudents, scopedStudents.length),
         graduationForecastRate: percentage(scheduleAll.pass, scheduleAll.total),
+        averageConductScore: conductValues.length
+          ? availableMetric(conductValues.reduce((sum, score) => sum + score, 0) / conductValues.length, conductValues.length, scopedStudents.length)
+          : unavailableMetric(),
+        activityParticipationRate: periodActivities.length
+          ? percentage(activityStudentIds.size, scopedStudents.length)
+          : unavailableMetric(),
       },
       gradeDistribution,
-      gpaTrend: selectedTerm && gpaValues.length
-        ? [{
-            label: `${currentYear?.sYearCode || ""} ${selectedTerm.sTermCode}`.trim(),
-            academicYear: currentYear?.sYearCode || "",
-            termCode: selectedTerm.sTermCode,
-            average: averageGpa || 0,
-            count: gpaValues.length,
-          }]
-        : [],
+      gpaTrend,
       cohortProgress: [scheduleAll, ...byCohort],
       programProgress: [scheduleAll, ...byProgram],
-      conductByClass: classes.map((item) => ({ classId: item.classId, className: item.className, median: null, count: 0 })),
+      conductByClass: classes.map((item) => {
+        const values = approvedConduct.filter((row) => row.sClassStudentId === item.classId).map((row) => row.score);
+        return { classId: item.classId, className: item.className, median: median(values), count: values.length };
+      }),
+      conductDistribution: conductGroups,
+      activities: {
+        total: periodActivities.length,
+        participations: activityParticipations.length,
+        participatingStudents: activityStudentIds.size,
+        completed: activityParticipations.filter((row) => row.status === "completed").length,
+      },
       gpaByClass,
       registrationProgress: [registrationAll, ...registrationByCohort],
       programRegistrationProgress: [registrationAll, ...registrationByProgram],
@@ -419,6 +536,20 @@ export class DashboardService {
           cutoff: latestRuns[0]?.sourceCapturedAt || latestRuns[0]?.completedAt || null,
           reasonCodes: ["REGISTRATION_BEHIND", "PROGRAM_PROGRESS_BEHIND"],
         },
+        conduct: {
+          academicTermId: selectedTerm?.id || null,
+          periodLabel: selectedTerm ? `${currentYear?.sYearCode || ""} ${selectedTerm.sTermCode}`.trim() : null,
+          approvedStudents: conductValues.length,
+          pendingStudents: conductRows.filter((row) => row.statusId === "0").length,
+          missingStudents: Math.max(0, scopedStudents.length - conductRows.length),
+          recognizedField: "lastScore",
+        },
+        activities: {
+          academicTermId: selectedTerm?.id || null,
+          activities: periodActivities.length,
+          participatingStudents: activityStudentIds.size,
+          missingStudents: Math.max(0, scopedStudents.length - activityStudentIds.size),
+        },
       },
       filterOptions: {
         academicYears: years.map((year) => ({ value: year.sYearCode, label: year.sYearCode })),
@@ -427,6 +558,18 @@ export class DashboardService {
           .filter((program) => programCodes.has(program.sProgramCode))
           .map((program) => ({ value: program.sProgramCode, label: program.sProgramName })),
         classes: classes.map((item) => ({ value: item.id, label: item.className })),
+        warningLevels: [
+          { value: "high", label: "Đỏ" },
+          { value: "medium", label: "Vàng" },
+        ],
+        supportStatuses: [
+          { value: "NONE", label: "Chưa hỗ trợ" },
+          { value: "OPEN", label: "Mở" },
+          { value: "IN_PROGRESS", label: "Đang xử lý" },
+          { value: "ESCALATED", label: "Đã chuyển cấp" },
+          { value: "REOPENED", label: "Mở lại" },
+          { value: "RESOLVED", label: "Đã giải quyết" },
+        ],
       },
     };
 
@@ -444,6 +587,10 @@ export class DashboardService {
         green: liveWarningReport.counts.safe,
         evaluated: liveWarningReport.counts.evaluated,
         unassessed: liveWarningReport.counts.unassessed,
+        conductApproved: conductValues.length,
+        conductPending: conductRows.filter((row) => row.statusId === "0").length,
+        conductMissing: Math.max(0, scopedStudents.length - conductRows.length),
+        activityMissing: Math.max(0, scopedStudents.length - activityStudentIds.size),
       },
       topClasses: classes.map((item) => {
         const total = scopedStudents.filter((student) => student.sClassStudentId === item.classId).length;

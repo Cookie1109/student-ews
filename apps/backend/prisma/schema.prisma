@@ -283,6 +283,51 @@ model StudentConductRecord {
   @@map("student_conduct_records")
 }
 
+model Activity {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sourceCode       String   @unique @map("source_code") @db.VarChar(64)
+  name             String   @db.VarChar(500)
+  type             String   @db.VarChar(128)
+  organizingUnit   String?  @map("organizing_unit") @db.VarChar(255)
+  academicTermId   String?  @map("academic_term_id") @db.Uuid
+  conductTermId    String?  @map("conduct_term_id") @db.Uuid
+  startDate        DateTime? @map("start_date") @db.Date
+  endDate          DateTime? @map("end_date") @db.Date
+  targetAudience   String?  @map("target_audience") @db.VarChar(255)
+  description      String?
+  sourcePayload    Json     @default("{}") @map("source_payload")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  participations ActivityParticipation[]
+
+  @@index([academicTermId, type], map: "activities_term_type_idx")
+  @@index([conductTermId], map: "activities_conduct_term_idx")
+  @@map("activities")
+}
+
+model ActivityParticipation {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId     String   @map("student_id") @db.Uuid
+  activityId    String   @map("activity_id") @db.Uuid
+  status        String   @default("registered") @db.VarChar(32)
+  evidence      String?  @db.VarChar(500)
+  verifiedBy    String?  @map("verified_by") @db.Uuid
+  verifiedAt    DateTime? @map("verified_at") @db.Timestamptz(6)
+  notes         String?
+  sourcePayload Json     @default("{}") @map("source_payload")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Restrict)
+
+  @@unique([studentId, activityId], map: "participation_student_activity_unique")
+  @@index([studentId, status], map: "activity_participations_student_status_idx")
+  @@index([activityId, status], map: "activity_participations_activity_status_idx")
+  @@index([verifiedBy], map: "activity_participations_verified_by_idx")
+  @@map("activity_participations")
+}
+
 model StudentCumulativeSummary {
   id                          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   studentId                   String   @map("student_id") @db.Uuid
@@ -731,6 +776,7 @@ model AcademicWarningPolicy {
   name                   String   @db.VarChar(160)
   termGpaThreshold       Decimal  @map("term_gpa_threshold") @db.Decimal(4, 2)
   cumulativeGpaThreshold Decimal  @map("cumulative_gpa_threshold") @db.Decimal(4, 2)
+  conductScoreThreshold  Decimal  @default(50) @map("conduct_score_threshold") @db.Decimal(5, 2)
   version                Int
   status                 String   @default("active") @db.VarChar(16)
   createdBy              String?  @map("created_by") @db.Uuid

@@ -79,33 +79,33 @@
 
 #### 2.1 Rèn luyện
 
-- [ ] **Chuẩn hóa `StudentConductRecord`**: ánh xạ `statusId` sang trạng thái phê duyệt rõ ràng, xác định điểm nào là điểm công nhận (`lastScore` hay trường khác)
-- [ ] **Phân loại theo S5**: 90–100 Xuất sắc, 80–89 Tốt, 65–79 Khá, 50–64 TB, 35–49 Yếu, <35 Kém
-- [ ] **API bổ sung**: endpoint riêng cho rèn luyện sinh viên (GET danh sách, GET chi tiết theo kỳ)
-- [ ] **Tích hợp cảnh báo**: thêm reason code `LOW_CONDUCT_SCORE` khi điểm rèn luyện dưới ngưỡng theo dõi (cấu hình trong policy)
-- [ ] **Frontend**: hiển thị điểm rèn luyện trong hồ sơ sinh viên và dashboard
+- [x] **Chuẩn hóa `StudentConductRecord`**: ánh xạ `statusId` sang trạng thái phê duyệt rõ ràng, xác định điểm nào là điểm công nhận (`lastScore` hay trường khác)
+- [x] **Phân loại theo S5**: 90–100 Xuất sắc, 80–89 Tốt, 65–79 Khá, 50–64 TB, 35–49 Yếu, <35 Kém
+- [x] **API bổ sung**: endpoint riêng cho rèn luyện sinh viên (GET danh sách, GET chi tiết theo kỳ)
+- [x] **Tích hợp cảnh báo**: thêm reason code `LOW_CONDUCT_SCORE` khi điểm rèn luyện dưới ngưỡng theo dõi (cấu hình trong policy)
+- [x] **Frontend**: hiển thị điểm rèn luyện trong hồ sơ sinh viên và dashboard
 
 #### 2.2 Hoạt động (tối thiểu khả thi)
 
-- [ ] **Model mới**: `Activity` và `ActivityParticipation` theo đề xuất Mục 8
+- [x] **Model mới**: `Activity` và `ActivityParticipation` theo đề xuất Mục 8
   ```
   Activity: id, sourceCode, name, type, organizingUnit, semester, 
             targetAudience, startDate, endDate
   ActivityParticipation: id, studentId, activityId, status (registered/
             attended/completed), evidence, verifiedBy, verifiedAt
   ```
-- [ ] **Migration Prisma**: tạo bảng, index, FK
-- [ ] **API CRUD**: GET/POST/PUT cho Activity; GET/POST cho Participation (ghi nhận, xác nhận)
-- [ ] **Chống trùng**: kiểm tra trùng đăng ký/tham dự theo `studentId + activityId`
-- [ ] **Frontend**: trang danh sách hoạt động, ghi nhận tham gia, bộ lọc theo kỳ/loại
+- [x] **Migration Prisma**: tạo bảng, index, FK
+- [x] **API CRUD**: GET/POST/PUT cho Activity; GET/POST cho Participation (ghi nhận, xác nhận)
+- [x] **Chống trùng**: kiểm tra trùng đăng ký/tham dự theo `studentId + activityId`
+- [x] **Frontend**: trang danh sách hoạt động, ghi nhận tham gia, bộ lọc theo kỳ/loại
 
 #### 2.3 Dashboard nâng cao
 
-- [ ] **Tổng hợp đa nguồn**: dashboard hiển thị cảnh báo, rèn luyện, hoạt động song song
-- [ ] **Bộ lọc nâng cao**: theo kỳ, khóa, CTĐT, mức cảnh báo, trạng thái hỗ trợ
+- [x] **Tổng hợp đa nguồn**: dashboard hiển thị cảnh báo, rèn luyện, hoạt động song song
+- [x] **Bộ lọc nâng cao**: theo kỳ, khóa, CTĐT, mức cảnh báo, trạng thái hỗ trợ
 - [x] **Báo cáo cảnh báo hiện tại**: có phân bố Đỏ/Vàng/Xanh/Xám, xu hướng cảnh báo theo kỳ, thống kê theo lớp và drill-down danh sách
-- [ ] **Biểu đồ còn thiếu**: xu hướng GPA nhiều kỳ và phân bố rèn luyện; biểu đồ GPA trên dashboard hiện chưa tạo thành chuỗi lịch sử nhiều kỳ
-- [ ] **Chỉ số thiếu dữ liệu đa nguồn**: báo cáo đã có số SV thiếu GPA kỳ; còn thiếu chỉ số dữ liệu rèn luyện và hoạt động
+- [x] **Biểu đồ còn thiếu**: xu hướng GPA nhiều kỳ và phân bố rèn luyện; biểu đồ GPA trên dashboard hiện chưa tạo thành chuỗi lịch sử nhiều kỳ
+- [x] **Chỉ số thiếu dữ liệu đa nguồn**: báo cáo đã có số SV thiếu GPA kỳ; còn thiếu chỉ số dữ liệu rèn luyện và hoạt động
 
 **Sản phẩm giao nộp:** Báo cáo lần 2, demo luồng nhập → tính → hiển thị đa nguồn
 
@@ -300,7 +300,7 @@ flowchart TD
 - [ ] Cảnh báo theo quy tắc với đầy đủ nguyên nhân, snapshot, truy vết nguồn
 - [ ] Nhật ký hỗ trợ có state machine và phân công
 - [ ] Phân quyền đúng theo vai trò và phạm vi dữ liệu
-- [ ] Dashboard tổng hợp đa nguồn với bộ lọc
+- [x] Dashboard tổng hợp đa nguồn với bộ lọc
 - [ ] Báo cáo xuất Excel/PDF
 - [ ] Test bao phủ edge case chính
 - [ ] Tài liệu cập nhật (README, ARCHITECTURE, hướng dẫn sử dụng)

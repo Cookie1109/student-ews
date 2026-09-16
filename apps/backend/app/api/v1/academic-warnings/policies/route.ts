@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
       policyName?: string;
       termGpaThreshold?: number;
       cumulativeGpaThreshold?: number;
+      conductScoreThreshold?: number;
       status?: string;
     }>(req);
     const name = body.name || body.policyName;

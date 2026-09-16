@@ -22,6 +22,8 @@ export async function GET(req: NextRequest) {
       cohortId: req.nextUrl.searchParams.get("cohortId") || undefined,
       trainingProgramId: req.nextUrl.searchParams.get("trainingProgramId") || undefined,
       academicTermId: req.nextUrl.searchParams.get("academicTermId") || undefined,
+      warningLevel: req.nextUrl.searchParams.get("warningLevel") || undefined,
+      supportStatus: req.nextUrl.searchParams.get("supportStatus") || undefined,
     }, await studentScopeWhere(auth.actor), await warningRunScopeWhere(auth.actor));
     return jsonResponse(summary);
   } catch (err) {

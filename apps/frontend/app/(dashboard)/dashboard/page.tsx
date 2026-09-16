@@ -15,6 +15,8 @@ interface FilterState {
   classId?: string;
   gpaScope: "cumulative" | "term";
   gpaAggregation: "average" | "median";
+  warningLevel?: string;
+  supportStatus?: string;
 }
 
 interface DashboardMetric {
@@ -63,6 +65,8 @@ export default function DashboardPage() {
     classId: "",
     gpaScope: "cumulative",
     gpaAggregation: "average",
+    warningLevel: "",
+    supportStatus: "",
   });
 
   const [completionBreakdown, setCompletionBreakdown] = useState<"program" | "cohort">("program");
@@ -95,6 +99,8 @@ export default function DashboardPage() {
         if (filters.termCode) params.set("termCode", filters.termCode);
         if (filters.programCode) params.set("programCode", filters.programCode);
         if (filters.classId) params.set("classId", filters.classId);
+        if (filters.warningLevel) params.set("warningLevel", filters.warningLevel);
+        if (filters.supportStatus) params.set("supportStatus", filters.supportStatus);
         const response = await fetch(`/api/v1/dashboard/summary?${params.toString()}`, { signal: controller.signal });
         if (!response.ok) throw new Error("Không thể tải dữ liệu tổng quan");
         const data = await response.json();
@@ -144,14 +150,14 @@ export default function DashboardPage() {
 
   // Derived metrics
   const totalStudents = summaryData?.totalStudents ?? 0;
-  const totalClasses = summaryData?.totalClasses ?? 0;
   const redCount = summaryData?.counts?.red ?? 0;
   const yellowCount = summaryData?.counts?.yellow ?? 0;
   const warningTotal = redCount + yellowCount;
   const gpaMetric = summaryData?.metrics?.averageGpa as DashboardMetric | undefined;
   const completionMetric = summaryData?.metrics?.completionRate as DashboardMetric | undefined;
   const registrationMetric = summaryData?.metrics?.registrationRate as DashboardMetric | undefined;
-  const graduationMetric = summaryData?.metrics?.graduationForecastRate as DashboardMetric | undefined;
+  const conductMetric = summaryData?.metrics?.averageConductScore as DashboardMetric | undefined;
+  const activityMetric = summaryData?.metrics?.activityParticipationRate as DashboardMetric | undefined;
   const selectedClass = classes.find((item) => item.id === filters.classId);
   const metricPercent = (metric?: DashboardMetric) => metric?.status === "available" && typeof metric.value === "number"
     ? `${metric.value.toFixed(1)}%`
@@ -162,6 +168,9 @@ export default function DashboardPage() {
 
   const gradeDistributionData = Array.isArray(summaryData?.gradeDistribution) ? summaryData.gradeDistribution : [];
   const gpaTrendData = Array.isArray(summaryData?.gpaTrend) ? summaryData.gpaTrend : [];
+  const conductDistributionData = Array.isArray(summaryData?.conductDistribution)
+    ? summaryData.conductDistribution.filter((item: { count: number }) => item.count > 0)
+    : [];
   const toPercentages = (items: ProgressPoint[]) => items
     .filter((item) => item.code !== "all" && Number(item.total) > 0)
     .map((item) => ({
@@ -176,9 +185,6 @@ export default function DashboardPage() {
   const programRegistrationData = toPercentages(summaryData?.programRegistrationProgress || []);
   const cohortRegistrationData = toPercentages(summaryData?.registrationProgress || []);
   const warningByClassData = Array.isArray(summaryData?.warningByClass) ? summaryData.warningByClass.slice(0, 7) : [];
-  const gpaByClassData = Array.isArray(summaryData?.gpaByClass)
-    ? summaryData.gpaByClass.filter((item: { value: number | null }) => item.value != null).slice(0, 7)
-    : [];
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -240,6 +246,8 @@ export default function DashboardPage() {
             classId: "",
             gpaScope: "cumulative",
             gpaAggregation: "average",
+            warningLevel: "",
+            supportStatus: "",
           })
         }
         actions={
@@ -305,10 +313,34 @@ export default function DashboardPage() {
             </option>
           ))}
         </select>
+
+        <select
+          value={filters.warningLevel}
+          onChange={(e) => setFilters({ ...filters, warningLevel: e.target.value })}
+          className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+        >
+          <option value="">Tất cả mức cảnh báo</option>
+          <option value="high">Đỏ · Nguy cơ cao</option>
+          <option value="medium">Vàng · Cần lưu ý</option>
+        </select>
+
+        <select
+          value={filters.supportStatus}
+          onChange={(e) => setFilters({ ...filters, supportStatus: e.target.value })}
+          className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+        >
+          <option value="">Tất cả trạng thái hỗ trợ</option>
+          <option value="NONE">Chưa hỗ trợ</option>
+          <option value="OPEN">Mở</option>
+          <option value="IN_PROGRESS">Đang xử lý</option>
+          <option value="ESCALATED">Đã chuyển cấp</option>
+          <option value="REOPENED">Mở lại</option>
+          <option value="RESOLVED">Đã giải quyết</option>
+        </select>
       </FilterBar>
 
       {summaryData?.dataContext && (
-        <section className="grid gap-3 md:grid-cols-3" aria-label="Nguồn và thời điểm dữ liệu dashboard">
+        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5" aria-label="Nguồn và thời điểm dữ liệu dashboard">
           <div className="rounded-2xl border border-blue-200/80 bg-blue-50/50 px-4 py-3">
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-700">GPA</p>
             <p className="mt-1 text-xs font-semibold text-slate-800">
@@ -340,6 +372,16 @@ export default function DashboardPage() {
                 ? ` · cutoff ${new Date(summaryData.dataContext.progress.cutoff).toLocaleString("vi-VN")}`
                 : ""}
             </p>
+          </div>
+          <div className="rounded-2xl border border-violet-200/80 bg-violet-50/50 px-4 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-violet-700">Rèn luyện</p>
+            <p className="mt-1 text-xs font-semibold text-slate-800">{summaryData.dataContext.conduct.periodLabel || "Chưa chọn kỳ"}</p>
+            <p className="mt-1 text-[11px] leading-4 text-slate-500">{summaryData.dataContext.conduct.approvedStudents} đã công nhận · {summaryData.dataContext.conduct.missingStudents} thiếu dữ liệu</p>
+          </div>
+          <div className="rounded-2xl border border-cyan-200/80 bg-cyan-50/50 px-4 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-700">Hoạt động</p>
+            <p className="mt-1 text-xs font-semibold text-slate-800">{summaryData.dataContext.activities.activities} hoạt động trong kỳ</p>
+            <p className="mt-1 text-[11px] leading-4 text-slate-500">{summaryData.dataContext.activities.participatingStudents} SV tham gia · {summaryData.dataContext.activities.missingStudents} chưa có dữ liệu</p>
           </div>
         </section>
       )}
@@ -406,13 +448,13 @@ export default function DashboardPage() {
             <p className="text-[10px] text-slate-400 mt-1">Đang theo học</p>
           </div>
 
-          {/* Card 2: Lớp */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs hover:border-[var(--color-primary)] transition-all">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Lớp học</span>
-            <div className="text-2xl font-bold text-slate-900 mt-1" style={{ fontFamily: "Outfit, sans-serif" }}>
-              {totalClasses}
+          {/* Card 2: Rèn luyện */}
+          <div className="bg-violet-50/20 border border-violet-200/90 rounded-2xl p-4 shadow-xs hover:border-violet-400 transition-all">
+            <span className="text-[11px] font-semibold text-violet-800 uppercase tracking-wider block">Điểm rèn luyện TB</span>
+            <div className="text-2xl font-bold text-violet-700 mt-1 font-mono">
+              {conductMetric?.status === "available" && typeof conductMetric.value === "number" ? conductMetric.value.toFixed(1) : "—"}
             </div>
-            <p className="text-[10px] text-slate-400 mt-1">Toàn khoa CNTT</p>
+            <p className="text-[10px] text-violet-700/80 mt-1">{conductMetric?.numerator ?? 0}/{totalStudents} SV đã công nhận</p>
           </div>
 
           {/* Card 3: GPA tích lũy TB */}
@@ -455,13 +497,13 @@ export default function DashboardPage() {
             <p className="text-[10px] text-amber-700/80 mt-1">{redCount} Đỏ · {yellowCount} Vàng</p>
           </div>
 
-          {/* Card 7: Completion estimate */}
-          <div className="bg-white border border-blue-200/80 rounded-2xl p-4 shadow-xs bg-blue-50/20 hover:border-blue-400 transition-all">
-            <span className="text-[11px] font-semibold text-blue-800 uppercase tracking-wider block">Dự kiến tốt nghiệp đúng hạn</span>
-            <div className="text-2xl font-bold text-blue-600 mt-1" style={{ fontFamily: "Outfit, sans-serif" }}>
-              {metricPercent(graduationMetric)}
+          {/* Card 7: Activities */}
+          <div className="bg-white border border-cyan-200/80 rounded-2xl p-4 shadow-xs bg-cyan-50/20 hover:border-cyan-400 transition-all">
+            <span className="text-[11px] font-semibold text-cyan-800 uppercase tracking-wider block">Tham gia hoạt động</span>
+            <div className="text-2xl font-bold text-cyan-700 mt-1" style={{ fontFamily: "Outfit, sans-serif" }}>
+              {metricPercent(activityMetric)}
             </div>
-            <p className="text-[10px] text-blue-700/80 mt-1">{metricRatio(graduationMetric, "Chưa có lần đánh giá")}</p>
+            <p className="text-[10px] text-cyan-700/80 mt-1">{metricRatio(activityMetric, "Chưa có hoạt động trong kỳ")}</p>
           </div>
         </div>
       </div>
@@ -532,9 +574,9 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm font-bold text-slate-900" style={{ fontFamily: "Outfit, sans-serif" }}>
-                Xu hướng GPA Tích lũy Trung bình
+                Xu hướng GPA nhiều học kỳ
               </h3>
-              <p className="text-xs text-slate-500">GPA của học kỳ đang chọn; chưa dựng xu hướng khi thiếu chuỗi kỳ</p>
+              <p className="text-xs text-slate-500">GPA học kỳ trung bình, tối đa 8 kỳ gần nhất theo phạm vi</p>
             </div>
             <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
               Thang 4.0
@@ -551,16 +593,16 @@ export default function DashboardPage() {
                 <LineChart data={gpaTrendData} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
                   <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748B" }} />
-                  <YAxis domain={[2.5, 3.2]} tick={{ fontSize: 11, fill: "#64748B" }} />
+                  <YAxis domain={[0, 4]} tick={{ fontSize: 11, fill: "#64748B" }} />
                   <Tooltip
-                    formatter={(val: any) => [val, "GPA tích lũy TB"]}
+                    formatter={(val: any) => [Number(val).toFixed(2), "GPA học kỳ TB"]}
                     contentStyle={{ borderRadius: 12, border: "1px solid #E2E8F0", fontSize: 12 }}
                   />
                   <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
                   <Line
                     type="monotone"
                     dataKey="average"
-                    name="GPA tích lũy TB"
+                    name="GPA học kỳ TB"
                     stroke={THEME_COLORS.primary}
                     strokeWidth={3}
                     dot={{ r: 4, fill: THEME_COLORS.primary }}
@@ -734,52 +776,34 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Chart 6: GPA theo Lớp - Col 6 */}
+        {/* Chart 6: Conduct distribution - Col 6 */}
         <div className="lg:col-span-6 bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm font-bold text-slate-900" style={{ fontFamily: "Outfit, sans-serif" }}>
-                {filters.gpaAggregation === "median" ? "Trung vị" : "Trung bình"} GPA {filters.gpaScope === "term" ? "Học kỳ" : "Tích lũy"} theo Lớp
+                Phân bố điểm rèn luyện
               </h3>
-              <p className="text-xs text-slate-500">So sánh kết quả GPA giữa các lớp sinh viên</p>
+              <p className="text-xs text-slate-500">Chỉ tính điểm lastScore đã được công nhận trong học kỳ</p>
             </div>
-
-            <div className="flex items-center gap-1.5">
-              <select
-                value={filters.gpaScope}
-                onChange={(e) => setFilters({ ...filters, gpaScope: e.target.value as any })}
-                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-medium text-slate-700"
-              >
-                <option value="cumulative">Tích lũy</option>
-                <option value="term">Học kỳ</option>
-              </select>
-              <select
-                value={filters.gpaAggregation}
-                onChange={(e) => setFilters({ ...filters, gpaAggregation: e.target.value as any })}
-                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-medium text-slate-700"
-              >
-                <option value="median">Trung vị</option>
-                <option value="average">Trung bình</option>
-              </select>
-            </div>
+            <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-700">Thang 100</span>
           </div>
 
           <div className="h-[250px] w-full">
             {!mounted ? (
               <div className="h-full w-full bg-slate-50/70 animate-pulse rounded-xl" />
-            ) : gpaByClassData.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-xs text-slate-400">Chưa có GPA theo lớp trong phạm vi đã chọn</div>
+            ) : conductDistributionData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-xs text-slate-400">Chưa có điểm rèn luyện đã công nhận trong kỳ</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={gpaByClassData} layout="vertical" margin={{ top: 10, right: 20, left: 20, bottom: 0 }}>
+                <BarChart data={conductDistributionData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-                  <XAxis type="number" domain={[0, 4]} tick={{ fontSize: 11, fill: "#64748B" }} />
-                  <YAxis type="category" dataKey="classId" tick={{ fontSize: 11, fill: "#64748B" }} width={70} />
+                  <XAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "#64748B" }} />
+                  <YAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: "#64748B" }} />
                   <Tooltip
-                    formatter={(val: any) => [val, "Điểm GPA"]}
+                    formatter={(val: any) => [val, "Sinh viên"]}
                     contentStyle={{ borderRadius: 12, border: "1px solid #E2E8F0", fontSize: 12 }}
                   />
-                  <Bar dataKey="value" name="GPA" fill={THEME_COLORS.primary} radius={[0, 6, 6, 0]} />
+                  <Bar dataKey="count" name="Sinh viên" fill={THEME_COLORS.purple} radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}

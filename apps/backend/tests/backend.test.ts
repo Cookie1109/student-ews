@@ -20,6 +20,7 @@ import { POST as refreshRoute } from "../app/api/v1/auth/refresh/route";
 import { signAccessToken } from "../lib/auth/jwt";
 import { assertWarningActionTransition, parseWarningActionStatus } from "../lib/services/warning-actions";
 import { ApiError } from "../lib/utils/api-error";
+import { classifyConductScore, conductApproval } from "../lib/services/conduct";
 
 const IDS = {
   student: "11111111-1111-4111-8111-111111111111",
@@ -39,6 +40,8 @@ test("API permission policy follows the Phase 2 contract", () => {
   assert.equal(requiredPermission("/api/v1/training-progress/completion-runs/preview", "POST"), "progress.calculate");
   assert.equal(requiredPermission("/api/v1/academic-warnings/actions", "POST"), "academic_warning.action.create");
   assert.equal(requiredPermission(`/api/v1/academic-warnings/actions/${IDS.plan}`, "PATCH"), "academic_warning.action.update");
+  assert.equal(requiredPermission("/api/v1/activities", "GET"), "activity.read");
+  assert.equal(requiredPermission(`/api/v1/activities/${IDS.plan}`, "PUT"), "activity.manage");
 });
 
 function apiOperations(): Set<string> {
@@ -324,6 +327,40 @@ test("warning evaluation promotes high-severity cumulative GPA and decision reas
   assert.equal(result.reasons[0].sourceId, IDS.term);
   assert.equal(result.reasons[1].sourceId, IDS.courseA);
   assert.equal(result.reasons[1].sourceType, "student_cumulative_summary");
+});
+
+test("conduct scores use S5 classification boundaries and explicit approval mapping", () => {
+  assert.equal(classifyConductScore(100), "Xuất sắc");
+  assert.equal(classifyConductScore(90), "Xuất sắc");
+  assert.equal(classifyConductScore(89), "Tốt");
+  assert.equal(classifyConductScore(80), "Tốt");
+  assert.equal(classifyConductScore(65), "Khá");
+  assert.equal(classifyConductScore(50), "Trung bình");
+  assert.equal(classifyConductScore(35), "Yếu");
+  assert.equal(classifyConductScore(34), "Kém");
+  assert.equal(conductApproval("1", 49).code, "approved");
+  assert.equal(conductApproval("0", null).code, "pending");
+});
+
+test("warning evaluation adds LOW_CONDUCT_SCORE only for approved recognized scores", () => {
+  const student = {
+    id: IDS.student, classId: null, cohortId: null, code: "SV001", name: "Sinh viên",
+    classCode: "", className: "", programCode: "CNTT",
+  };
+  const approved = new Map([[IDS.student, { id: IDS.plan, score: 49, statusId: "1" }]]);
+  const result = evaluate(student, new Map(), new Map(), new Map(), new Map(), {
+    termGpaThreshold: 2,
+    cumulativeGpaThreshold: 2,
+    conductScoreThreshold: 50,
+  }, approved);
+  assert.equal(result.reasons[0].reasonCode, "LOW_CONDUCT_SCORE");
+  assert.equal(result.reasons[0].sourceType, "student_conduct_record");
+  assert.equal(result.reasons[0].sourceId, IDS.plan);
+
+  approved.set(IDS.student, { id: IDS.plan, score: 49, statusId: "0" });
+  assert.equal(evaluate(student, new Map(), new Map(), new Map(), new Map(), {
+    termGpaThreshold: 2, cumulativeGpaThreshold: 2, conductScoreThreshold: 50,
+  }, approved).reasonCount, 0);
 });
 
 test("warning action state machine accepts workflow paths and rejects invalid jumps", () => {

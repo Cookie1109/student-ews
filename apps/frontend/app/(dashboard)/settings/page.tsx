@@ -14,6 +14,7 @@ export default function SettingsPage() {
   const [activePolicyId, setActivePolicyId] = useState<string>("");
   const [termGpaThreshold, setTermGpaThreshold] = useState<number>(2.0);
   const [cumulativeGpaThreshold, setCumulativeGpaThreshold] = useState<number>(2.0);
+  const [conductScoreThreshold, setConductScoreThreshold] = useState<number>(50);
   const [policyName, setPolicyName] = useState<string>("Chính sách theo dõi học vụ Khoa CNTT");
 
   useEffect(() => {
@@ -31,6 +32,7 @@ export default function SettingsPage() {
             setPolicyName(active.name || active.policyName || "Chính sách Cảnh báo Học vụ");
             setTermGpaThreshold(active.termGpaThreshold ?? 2.0);
             setCumulativeGpaThreshold(active.cumulativeGpaThreshold ?? 2.0);
+            setConductScoreThreshold(active.conductScoreThreshold ?? 50);
           }
         }
       } catch (err) {
@@ -58,6 +60,7 @@ export default function SettingsPage() {
           policyCode: "POL_" + Date.now(),
           termGpaThreshold: Number(termGpaThreshold),
           cumulativeGpaThreshold: Number(cumulativeGpaThreshold),
+          conductScoreThreshold: Number(conductScoreThreshold),
           status: "active",
         }),
       });
@@ -205,6 +208,30 @@ export default function SettingsPage() {
                 Phạm vi Can thiệp Hiện tại
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">Các chức năng đang có trong phiên bản đồ án</p>
+            </div>
+
+            <div className="p-4 bg-emerald-50/50 border border-emerald-200 rounded-2xl space-y-3">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <label className="text-xs font-bold text-emerald-900 block">Ngưỡng điểm rèn luyện (Thang 100)</label>
+                  <span className="text-[11px] text-emerald-700">Điểm đã công nhận dưới ngưỡng → LOW_CONDUCT_SCORE</span>
+                </div>
+                <span className="font-mono font-black text-lg text-emerald-700 bg-white border border-emerald-200 px-3 py-1 rounded-xl shadow-xs">
+                  {conductScoreThreshold}
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={conductScoreThreshold}
+                onChange={(e) => setConductScoreThreshold(Number(e.target.value))}
+                className="w-full accent-emerald-600 cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                <span>0</span><span>35</span><span>50</span><span>80</span><span>100</span>
+              </div>
             </div>
 
             <div className="space-y-2 text-xs text-slate-600">

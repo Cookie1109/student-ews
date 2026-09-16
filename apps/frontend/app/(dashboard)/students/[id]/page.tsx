@@ -10,7 +10,7 @@ import SlideOverDrawer from "@/components/ui/SlideOverDrawer";
 import Modal from "@/components/ui/Modal";
 import { useAuthStore } from "@/stores/authStore";
 
-type ActiveTab = "overview" | "grades" | "decisions" | "fee_policies" | "registrations" | "training_plan" | "warnings";
+type ActiveTab = "overview" | "conduct" | "grades" | "decisions" | "fee_policies" | "registrations" | "training_plan" | "warnings";
 
 const formatDate = (value?: string | Date | null) => {
   if (!value) return "Chưa cập nhật";
@@ -42,6 +42,7 @@ export default function StudentDetailPage() {
   const [registrationsData, setRegistrationsData] = useState<any[]>([]);
   const [trainingPlanData, setTrainingPlanData] = useState<any[]>([]);
   const [dashboardData, setDashboardData] = useState<any>(null);
+  const [conductData, setConductData] = useState<any>(null);
   const [loadIssues, setLoadIssues] = useState<string[]>([]);
 
   // Decision & Fee Policy interactive states
@@ -77,7 +78,7 @@ export default function StudentDetailPage() {
       try {
         setLoading(true);
         setLoadIssues([]);
-        const [sRes, dRes, gRes, sumRes, decRes, feeRes, regRes] = await Promise.all([
+        const [sRes, dRes, gRes, sumRes, decRes, feeRes, regRes, conductRes] = await Promise.all([
           fetch(`/api/v1/students/${studentId}`),
           fetch(`/api/v1/students/${studentId}/dashboard`),
           fetch(`/api/v1/students/${studentId}/grades`),
@@ -85,6 +86,7 @@ export default function StudentDetailPage() {
           fetch(`/api/v1/students/${studentId}/decisions`),
           fetch(`/api/v1/students/${studentId}/fee-policies`),
           fetch(`/api/v1/students/${studentId}/registrations?pageSize=100`),
+          fetch(`/api/v1/students/${studentId}/conduct`),
         ]);
 
         if (!sRes.ok) throw new Error("Không thể tải hồ sơ sinh viên");
@@ -128,6 +130,9 @@ export default function StudentDetailPage() {
           const regJson = await regRes.json();
           setRegistrationsData(regJson.items || regJson || []);
         } else issues.push("đăng ký học phần");
+        if (conductRes.ok) {
+          setConductData(await conductRes.json());
+        } else issues.push("điểm rèn luyện");
         setLoadIssues(issues);
       } catch (err) {
         console.error("Error loading student details:", err);
@@ -160,8 +165,8 @@ export default function StudentDetailPage() {
   const sProgram = student?.program?.code || student?.studyProgramId || dashboardData?.student?.programCode || "Chưa xác định";
   const cumulative = summariesData?.cumulative || student?.cumulative || dashboardData?.cumulative;
   const latestTerm = (summariesData?.terms || []).at(-1);
-  const latestConduct = (summariesData?.conductRecords || [])
-    .filter((record: any) => record.finalScore != null)
+  const latestConduct = (conductData?.items || [])
+    .filter((record: any) => record.scores?.recognized != null)
     .at(-1);
   const progressStatus = dashboardData?.completion?.available
     ? scheduleLabel(dashboardData.completion.scheduleStatus)
@@ -266,14 +271,15 @@ export default function StudentDetailPage() {
       <div className="flex items-center space-x-1 border-b border-[var(--color-border)] overflow-x-auto scrollbar-hide">
         {[
           { id: "overview", label: "1. Tổng quan", icon: "📊" },
-          { id: "grades", label: "2. Điểm học phần", icon: "📝" },
-          { id: "decisions", label: "3. Quyết định", icon: "📜" },
-          { id: "fee_policies", label: "4. Chính sách học phí", icon: "💰" },
-          { id: "registrations", label: "5. Đăng ký học phần", icon: "📚" },
-          { id: "training_plan", label: "6. Kế hoạch đào tạo", icon: "🎯" },
+          { id: "conduct", label: "2. Rèn luyện", icon: "🌱" },
+          { id: "grades", label: "3. Điểm học phần", icon: "📝" },
+          { id: "decisions", label: "4. Quyết định", icon: "📜" },
+          { id: "fee_policies", label: "5. Chính sách học phí", icon: "💰" },
+          { id: "registrations", label: "6. Đăng ký học phần", icon: "📚" },
+          { id: "training_plan", label: "7. Kế hoạch đào tạo", icon: "🎯" },
           {
             id: "warnings",
-            label: "7. Cảnh báo học vụ",
+            label: "8. Cảnh báo học vụ",
             icon: "⚠️",
             badge: (student?.warningHistory?.length || (student?.warningLevel && student.warningLevel !== "green")) ? "!" : undefined,
           },
@@ -444,7 +450,7 @@ export default function StudentDetailPage() {
                   <div className="flex justify-between gap-4 py-2.5 border-b border-slate-100">
                     <dt className="text-slate-500">Điểm rèn luyện gần nhất</dt>
                     <dd className="font-mono font-bold text-slate-900">
-                      {latestConduct?.finalScore ?? latestTerm?.conductScore ?? "—"}
+                      {latestConduct?.scores?.recognized ?? latestTerm?.conductScore ?? "—"}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-4 py-2.5">
@@ -456,6 +462,43 @@ export default function StudentDetailPage() {
             </section>
           </div>
         </div>
+      )}
+
+      {activeTab === "conduct" && (
+        <section className="space-y-5">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Điểm công nhận gần nhất</p>
+              <p className="mt-2 font-mono text-3xl font-black text-emerald-800">{latestConduct?.scores?.recognized ?? "—"}</p>
+              <p className="mt-1 text-xs text-emerald-700">{latestConduct?.classification || "Chưa phân loại"}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Đã công nhận</p>
+              <p className="mt-2 font-mono text-3xl font-black text-slate-900">{conductData?.approved ?? 0}</p>
+              <p className="mt-1 text-xs text-slate-500">bản ghi theo học kỳ</p>
+            </div>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700">Đang chờ</p>
+              <p className="mt-2 font-mono text-3xl font-black text-amber-800">{conductData?.pending ?? 0}</p>
+              <p className="mt-1 text-xs text-amber-700">chưa có điểm chính thức</p>
+            </div>
+          </div>
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+            <div className="border-b border-slate-200 px-5 py-4">
+              <h3 className="font-bold text-slate-900">Lịch sử điểm rèn luyện</h3>
+              <p className="mt-0.5 text-xs text-slate-500">lastScore chỉ được dùng khi nguồn dữ liệu có trạng thái đã công nhận.</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead><tr className="bg-slate-50 text-[10px] font-semibold uppercase text-slate-500"><th className="px-4 py-3">Học kỳ</th><th className="px-4 py-3">Tự đánh giá</th><th className="px-4 py-3">Lớp</th><th className="px-4 py-3">Khoa</th><th className="px-4 py-3">Công nhận</th><th className="px-4 py-3">Xếp loại</th><th className="px-4 py-3">Trạng thái</th></tr></thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(conductData?.items || []).map((record: any) => <tr key={record.id}><td className="px-4 py-3 font-semibold text-slate-800">{record.termCode} {record.academicYear}</td><td className="px-4 py-3 font-mono">{record.scores.self ?? "—"}</td><td className="px-4 py-3 font-mono">{record.scores.class ?? "—"}</td><td className="px-4 py-3 font-mono">{record.scores.department ?? "—"}</td><td className="px-4 py-3 font-mono font-bold">{record.scores.recognized ?? "—"}</td><td className="px-4 py-3">{record.classification || "—"}</td><td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${record.approval.code === "approved" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{record.approval.label}</span></td></tr>)}
+                  {!conductData?.items?.length && <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">Chưa có dữ liệu rèn luyện.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
       )}
 
       {/* 2. Grades Tab */}
