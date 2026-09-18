@@ -169,6 +169,8 @@ export class ReportsService {
       search?: string;
       academicTermId?: string;
       academicYearId?: string;
+      cohortId?: string;
+      programCode?: string;
       page?: number;
       pageSize?: number;
     } = {},
@@ -178,9 +180,18 @@ export class ReportsService {
     // API routes still cap public pagination at 100. Internal consumers such as
     // the student list may request the complete warning set for accurate filters.
     const pageSize = Math.min(1000, Math.max(1, filters.pageSize || 20));
+    const cohortClassCodes = filters.cohortId
+      ? (await prisma.class.findMany({ where: { cohortId: filters.cohortId, deletedAt: null }, select: { classId: true } }))
+          .map((item) => item.classId)
+      : undefined;
     const [students, policy, terms, years, classes] = await Promise.all([
       prisma.student.findMany({
-        where: { AND: [{ deletedAt: null }, studentScope] },
+        where: { AND: [
+          { deletedAt: null },
+          studentScope,
+          filters.programCode ? { sStudyProgramId: filters.programCode } : {},
+          cohortClassCodes ? { sClassStudentId: { in: cohortClassCodes } } : {},
+        ] },
         select: {
           id: true,
           sStudentId: true,

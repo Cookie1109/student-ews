@@ -51,6 +51,7 @@ type WarningReport = {
 };
 
 type DrawerFilter = { label: string; severity?: Severity; classCode?: string };
+type ExportType = "warnings" | "progress" | "conduct" | "support";
 
 const reasonLabel = (code: string) => {
   if (code === "LOW_CUMULATIVE_GPA") return "GPA tích lũy dưới ngưỡng";
@@ -58,8 +59,6 @@ const reasonLabel = (code: string) => {
   if (code === "ACADEMIC_WARNING_DECISION") return "Có quyết định cảnh báo";
   return code;
 };
-
-const csvCell = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
 
 type PieTooltipItem = {
   name?: string;
@@ -155,7 +154,8 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [report, setReport] = useState<WarningReport | null>(null);
   const [loadError, setLoadError] = useState("");
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState<"xlsx" | "pdf" | null>(null);
+  const [exportType, setExportType] = useState<ExportType>("warnings");
   const [exportError, setExportError] = useState("");
   const [drawerFilter, setDrawerFilter] = useState<DrawerFilter | null>(null);
   const [drawerData, setDrawerData] = useState<WarningReport | null>(null);
@@ -214,39 +214,22 @@ export default function ReportsPage() {
     setSearch("");
   };
 
-  const fetchAllWarningStudents = async () => {
-    const firstResponse = await fetch("/api/v1/reports/academic-warnings?page=1&pageSize=100");
-    if (!firstResponse.ok) throw new Error("Không thể tải danh sách để xuất báo cáo");
-    const first: WarningReport = await firstResponse.json();
-    if (first.totalPages <= 1) return first.items;
-    const remaining = await Promise.all(
-      Array.from({ length: first.totalPages - 1 }, (_, index) =>
-        fetch(`/api/v1/reports/academic-warnings?page=${index + 2}&pageSize=100`).then(async (response) => {
-          if (!response.ok) throw new Error("Không thể tải đủ dữ liệu để xuất báo cáo");
-          return response.json() as Promise<WarningReport>;
-        }),
-      ),
-    );
-    return [first, ...remaining].flatMap((result) => result.items);
-  };
-
-  const handleExportExcel = async () => {
+  const handleExport = async (format: "xlsx" | "pdf") => {
     try {
-      setExporting(true);
+      setExporting(format);
       setExportError("");
-      const students = await fetchAllWarningStudents();
-      const headers = ["Mã SV", "Họ và tên", "Lớp", "Chương trình", "Mức cảnh báo", "GPA học kỳ", "GPA tích lũy", "Nguyên nhân"];
-      const rows = students.map((student) => [
-        student.studentCode, student.studentName, student.classCode, student.programCode,
-        student.severity === "high" ? "Nguy cơ cao" : "Cần lưu ý",
-        student.termGpa4 ?? "", student.cumulativeGpa4 ?? "",
-        student.reasonCodes.map(reasonLabel).join("; "),
-      ]);
-      const csv = "\uFEFF" + [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
-      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      const type = format === "pdf" ? "warnings" : exportType;
+      const response = await fetch(`/api/v1/reports/export?format=${format}&type=${type}`);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error?.message || "Không thể tạo file báo cáo");
+      }
+      const url = URL.createObjectURL(await response.blob());
       const link = document.createElement("a");
       link.href = url;
-      link.download = `Bao_cao_canh_bao_hoc_vu_${new Date().toISOString().slice(0, 10)}.csv`;
+      const disposition = response.headers.get("content-disposition") || "";
+      const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+      link.download = encodedName ? decodeURIComponent(encodedName) : `bao_cao.${format}`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -254,7 +237,7 @@ export default function ReportsPage() {
     } catch (error) {
       setExportError(error instanceof Error ? error.message : "Không thể xuất báo cáo");
     } finally {
-      setExporting(false);
+      setExporting(null);
     }
   };
 
@@ -294,9 +277,16 @@ export default function ReportsPage() {
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>Báo cáo tổng hợp học vụ & cảnh báo sớm</h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">Bấm vào mức cảnh báo hoặc lớp để xem danh sách sinh viên tương ứng.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button type="button" disabled={exporting} onClick={handleExportExcel} className="px-4 py-2 border border-slate-200 text-slate-700 text-xs font-semibold rounded-xl hover:bg-slate-50 active:scale-[0.98] transition bg-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]">{exporting ? "Đang xuất..." : "Xuất Excel (CSV)"}</button>
-          <button type="button" onClick={() => window.print()} className="px-4 py-2 bg-[var(--color-primary)] text-white text-xs font-semibold rounded-xl hover:opacity-90 active:scale-[0.98] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]">In báo cáo / PDF</button>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="sr-only" htmlFor="report-export-type">Loại dữ liệu xuất</label>
+          <select id="report-export-type" value={exportType} onChange={(event) => setExportType(event.target.value as ExportType)} disabled={Boolean(exporting)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]">
+            <option value="warnings">Danh sách cảnh báo</option>
+            <option value="progress">Tiến độ CTĐT</option>
+            <option value="conduct">Kết quả rèn luyện</option>
+            <option value="support">Nhật ký hỗ trợ</option>
+          </select>
+          <button type="button" disabled={Boolean(exporting)} onClick={() => void handleExport("xlsx")} className="px-4 py-2 border border-slate-200 text-slate-700 text-xs font-semibold rounded-xl hover:bg-slate-50 active:scale-[0.98] transition bg-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]">{exporting === "xlsx" ? "Đang tạo XLSX..." : "Xuất Excel (.xlsx)"}</button>
+          <button type="button" disabled={Boolean(exporting)} onClick={() => void handleExport("pdf")} className="px-4 py-2 bg-[var(--color-primary)] text-white text-xs font-semibold rounded-xl hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]">{exporting === "pdf" ? "Đang tạo PDF..." : "Xuất PDF tổng hợp"}</button>
         </div>
       </header>
 

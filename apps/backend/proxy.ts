@@ -91,6 +91,7 @@ export function requiredPermission(pathname: string, method: string): string | n
     return "academic_warning.read";
   }
   if (pathname.startsWith("/api/v1/academic-context")) return "progress.read";
+  if (pathname.startsWith("/api/v1/reports/export")) return "report.export";
   if (pathname.startsWith("/api/v1/dashboard")) return null;
   return null;
 }

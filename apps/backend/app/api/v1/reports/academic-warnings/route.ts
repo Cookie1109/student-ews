@@ -20,6 +20,8 @@ export async function GET(req: NextRequest) {
       search: req.nextUrl.searchParams.get("search") || undefined,
       academicTermId: req.nextUrl.searchParams.get("academicTermId") || undefined,
       academicYearId: req.nextUrl.searchParams.get("academicYearId") || undefined,
+      cohortId: req.nextUrl.searchParams.get("cohortId") || undefined,
+      programCode: req.nextUrl.searchParams.get("programCode") || undefined,
       page,
       pageSize,
     }, await studentScopeWhere(auth.actor));

@@ -19,6 +19,7 @@ type ConductRecord = {
   academicYear: string | null;
   termCode: string | null;
   termName: string | null;
+  isSummer: boolean;
   scores: {
     self: number | null;
     class: number | null;
@@ -86,19 +87,21 @@ export default function StudentDetailPage() {
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
   const [loading, setLoading] = useState(true);
-  const [student, setStudent] = useState<any>(null);
-  const [gradesData, setGradesData] = useState<any[]>([]);
-  const [summariesData, setSummariesData] = useState<any>(null);
-  const [decisionsData, setDecisionsData] = useState<any[]>([]);
-  const [feePoliciesData, setFeePoliciesData] = useState<any[]>([]);
-  const [registrationsData, setRegistrationsData] = useState<any[]>([]);
-  const [trainingPlanData, setTrainingPlanData] = useState<any[]>([]);
-  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [student, setStudent] = useState<ApiData>(null);
+  const [gradesData, setGradesData] = useState<ApiData[]>([]);
+  const [summariesData, setSummariesData] = useState<ApiData>(null);
+  const [decisionsData, setDecisionsData] = useState<ApiData[]>([]);
+  const [feePoliciesData, setFeePoliciesData] = useState<ApiData[]>([]);
+  const [registrationsData, setRegistrationsData] = useState<ApiData[]>([]);
+  const [trainingPlanData, setTrainingPlanData] = useState<ApiData[]>([]);
+  const [dashboardData, setDashboardData] = useState<ApiData>(null);
   const [conductData, setConductData] = useState<ConductResponse | null>(null);
   const [loadIssues, setLoadIssues] = useState<string[]>([]);
+  const [profileExporting, setProfileExporting] = useState(false);
+  const [profileExportError, setProfileExportError] = useState("");
 
   // Decision & Fee Policy interactive states
-  const [selectedDecisionDetail, setSelectedDecisionDetail] = useState<any | null>(null);
+  const [selectedDecisionDetail, setSelectedDecisionDetail] = useState<ApiData | null>(null);
   const [showAddFeeModal, setShowAddFeeModal] = useState(false);
   const [feeForm, setFeeForm] = useState({
     feeObjectDicId: "MIEN_GIAM_50",
@@ -121,6 +124,32 @@ export default function StudentDetailPage() {
     const sRes = await fetch(`/api/v1/students/${studentId}`);
     if (sRes.ok) {
       setStudent(await sRes.json());
+    }
+  };
+
+  const exportProfilePdf = async () => {
+    try {
+      setProfileExporting(true);
+      setProfileExportError("");
+      const response = await fetch(`/api/v1/reports/export?format=pdf&type=student-profile&studentId=${encodeURIComponent(studentId)}`);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error?.message || "Không thể tạo PDF hồ sơ");
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      const disposition = response.headers.get("content-disposition") || "";
+      const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+      link.download = encodedName ? decodeURIComponent(encodedName) : `ho_so_${studentId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setProfileExportError(error instanceof Error ? error.message : "Không thể tạo PDF hồ sơ");
+    } finally {
+      setProfileExporting(false);
     }
   };
 
@@ -232,22 +261,49 @@ export default function StudentDetailPage() {
     ? scheduleLabel(dashboardData.completion.scheduleStatus)
     : "Chưa có kỳ đánh giá";
   const passedCourseCodes = new Set(
-    gradesData.filter((grade: any) => grade.isPassed).map((grade: any) => grade.courseCode),
+    gradesData.filter((grade: ApiData) => grade.isPassed).map((grade: ApiData) => grade.courseCode),
   );
-  const plannedCredits = trainingPlanData.reduce((total: number, course: any) => total + Number(course.credits || 0), 0);
+  const plannedCredits = trainingPlanData.reduce((total: number, course: ApiData) => total + Number(course.credits || 0), 0);
   const completedPlanCredits = trainingPlanData.reduce(
-    (total: number, course: any) => total + (passedCourseCodes.has(course.courseCode) ? Number(course.credits || 0) : 0),
+    (total: number, course: ApiData) => total + (passedCourseCodes.has(course.courseCode) ? Number(course.credits || 0) : 0),
     0,
   );
 
   // GPA Trend data from summaries
   const gpaTrend = (summariesData?.terms || [])
-    .filter((t: any) => t.gpa4 != null || t.cumulativeGpa4 != null)
-    .map((t: any) => ({
+    .filter((t: ApiData) => t.gpa4 != null || t.cumulativeGpa4 != null)
+    .map((t: ApiData) => ({
       semester: t.academicYear ? `${t.termCode} ${t.academicYear}` : t.termCode || "HK",
       gpa4: t.gpa4,
       cumGpa4: t.cumulativeGpa4,
     }));
+
+  const unifiedTimeline = [
+    ...(student?.warningHistory || []).map((item: ApiData) => ({
+      id: `warning-${item.id}`,
+      date: item.createdAt,
+      kind: "Cảnh báo",
+      title: item.maxSeverity === "high" ? "Ghi nhận cảnh báo mức Đỏ" : "Ghi nhận cảnh báo mức Vàng",
+      detail: `${item.reasonCount || 0} nguyên nhân · GPA kỳ ${item.termGpa4 ?? "—"} · GPA tích lũy ${item.cumulativeGpa4 ?? "—"}`,
+      color: item.maxSeverity === "high" ? "bg-red-500" : "bg-amber-500",
+    })),
+    ...decisionsData.map((item: ApiData) => ({
+      id: `decision-${item.id}`,
+      date: item.signDate || item.createdAt,
+      kind: "Quyết định",
+      title: item.decisionName || "Quyết định học vụ",
+      detail: `Số ${item.decisionNumber || "chưa cập nhật"}${item.termId ? ` · ${item.termId} ${item.yearStudy || ""}` : ""}`,
+      color: item.isAcademicWarning ? "bg-purple-500" : "bg-blue-500",
+    })),
+    ...(student?.warningActions || []).map((item: ApiData) => ({
+      id: `action-${item.id}`,
+      date: item.createdAt,
+      kind: "Hỗ trợ",
+      title: `${item.actionType} · ${item.status}`,
+      detail: `${item.actorName || "Cán bộ phụ trách"}: ${item.note}`,
+      color: item.status === "RESOLVED" ? "bg-emerald-500" : item.status === "ESCALATED" ? "bg-red-500" : "bg-sky-500",
+    })),
+  ].filter((item) => item.date).sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -264,6 +320,11 @@ export default function StudentDetailPage() {
         </button>
 
         <div className="flex items-center gap-2">
+          {can("report.export") && (
+            <button type="button" disabled={profileExporting} onClick={() => void exportProfilePdf()} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:opacity-50">
+              {profileExporting ? "Đang tạo PDF..." : "Xuất PDF hồ sơ"}
+            </button>
+          )}
           <span className="text-xs font-mono bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200">
             MSSV: <strong>{sCode}</strong>
           </span>
@@ -343,6 +404,7 @@ export default function StudentDetailPage() {
           <strong>Một số phần chưa tải được:</strong> {loadIssues.join(", ")}. Hãy kiểm tra quyền truy cập hoặc thử tải lại trang.
         </div>
       )}
+      {profileExportError && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-800" role="alert">{profileExportError}</div>}
 
       {/* 6 Nav Tabs */}
       <div className="flex items-center space-x-1 border-b border-[var(--color-border)] overflow-x-auto scrollbar-hide">
@@ -725,7 +787,7 @@ export default function StudentDetailPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {summariesData.conductRecords.map((record: any) => (
+                    {summariesData.conductRecords.map((record: ApiData) => (
                       <tr key={record.id}>
                         <td className="py-2.5 px-3 font-medium text-slate-800">{record.academicYear || "—"}</td>
                         <td className="py-2.5 px-3">{record.termCode || "—"}</td>
@@ -751,7 +813,7 @@ export default function StudentDetailPage() {
                 Nguồn chưa cung cấp năm học hoặc học kỳ, nên các dòng này được bảo toàn nhưng không dùng để tính GPA.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                {summariesData.unscopedGrades.map((grade: any) => (
+                {summariesData.unscopedGrades.map((grade: ApiData) => (
                   <span key={grade.id} className="rounded-lg bg-white border border-amber-200 px-2.5 py-1.5 text-xs text-amber-950">
                     <strong>{grade.courseCode || "Chưa có mã HP"}</strong>
                     {grade.courseName ? ` · ${grade.courseName}` : ""}
@@ -784,7 +846,7 @@ export default function StudentDetailPage() {
                     </td>
                   </tr>
                 ) : (
-                  gradesData.map((g: any, i: number) => (
+                  gradesData.map((g: ApiData, i: number) => (
                     <tr key={g.id || i} className="hover:bg-slate-50">
                       <td className="py-3 px-3 font-mono font-bold text-slate-800">{g.courseCode}</td>
                       <td className="py-3 px-3 font-medium text-slate-900">{g.courseName}</td>
@@ -848,7 +910,7 @@ export default function StudentDetailPage() {
                     </td>
                   </tr>
                 ) : (
-                  decisionsData.map((d: any) => (
+                  decisionsData.map((d: ApiData) => (
                     <tr key={d.id} className="hover:bg-slate-50">
                       <td className="py-3 px-3 font-mono font-bold text-slate-800">{d.decisionNumber || d.sDecisionNumber}</td>
                       <td className="py-3 px-3 font-medium text-slate-900">{d.decisionName || d.sDecisionName}</td>
@@ -930,7 +992,7 @@ export default function StudentDetailPage() {
                     </td>
                   </tr>
                 ) : (
-                  feePoliciesData.map((f: any) => (
+                  feePoliciesData.map((f: ApiData) => (
                     <tr key={f.id} className="hover:bg-slate-50">
                       <td className="py-3 px-3 font-semibold text-slate-900">{f.feeObjectDicName || f.sFeeObjectDicName}</td>
                       <td className="py-3 px-3">
@@ -978,7 +1040,7 @@ export default function StudentDetailPage() {
                     </td>
                   </tr>
                 ) : (
-                  registrationsData.map((r: any) => (
+                  registrationsData.map((r: ApiData) => (
                     <tr key={r.id} className="hover:bg-slate-50">
                       <td className="py-3 px-3 font-mono font-bold text-slate-800">{r.courseCode}</td>
                       <td className="py-3 px-3 font-medium text-slate-900">{r.courseName}</td>
@@ -1044,7 +1106,7 @@ export default function StudentDetailPage() {
                         Chưa có khung học phần cho chương trình này.
                       </td>
                     </tr>
-                  ) : trainingPlanData.map((course: any) => {
+                  ) : trainingPlanData.map((course: ApiData) => {
                     const passed = passedCourseCodes.has(course.courseCode);
                     return (
                       <tr key={course.id} className="hover:bg-slate-50/70 transition-colors">
@@ -1116,6 +1178,38 @@ export default function StudentDetailPage() {
             </button>
           </div>
 
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs" aria-labelledby="student-unified-timeline">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 id="student-unified-timeline" className="text-sm font-bold text-slate-900" style={{ fontFamily: "Outfit, sans-serif" }}>Dòng thời gian hồ sơ hợp nhất</h3>
+                <p className="mt-0.5 text-xs text-slate-500">Cảnh báo, quyết định học vụ và hành động hỗ trợ theo cùng một trục thời gian.</p>
+              </div>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">{unifiedTimeline.length} sự kiện</span>
+            </div>
+            {!unifiedTimeline.length ? (
+              <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 py-8 text-center text-xs text-slate-500">Chưa có sự kiện để hiển thị.</div>
+            ) : (
+              <ol className="mt-5 space-y-0">
+                {unifiedTimeline.map((item, index) => (
+                  <li key={item.id} className="relative grid grid-cols-[18px_1fr] gap-3 pb-5 last:pb-0">
+                    {index < unifiedTimeline.length - 1 && <span className="absolute left-[8px] top-4 h-full w-px bg-slate-200" aria-hidden="true" />}
+                    <span className={`relative z-10 mt-1 h-[18px] w-[18px] rounded-full border-4 border-white shadow-sm ${item.color}`} aria-hidden="true" />
+                    <div className="min-w-0 rounded-xl border border-slate-100 bg-slate-50/70 px-3.5 py-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-md bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 ring-1 ring-slate-200">{item.kind}</span>
+                          <strong className="text-xs text-slate-900">{item.title}</strong>
+                        </div>
+                        <time className="font-mono text-[10px] text-slate-400">{new Date(item.date).toLocaleString("vi-VN")}</time>
+                      </div>
+                      <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-slate-600">{item.detail}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+
           {/* Metric Overview Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-xs">
@@ -1168,7 +1262,7 @@ export default function StudentDetailPage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {student.warningReasons.map((r: any, idx: number) => (
+                {student.warningReasons.map((r: ApiData, idx: number) => (
                   <div key={idx} className="p-3.5 rounded-xl border border-red-200 bg-red-50/50 space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-red-900 flex items-center gap-1.5">
@@ -1227,7 +1321,7 @@ export default function StudentDetailPage() {
                       </td>
                     </tr>
                   ) : (
-                    student.warningHistory.map((w: any) => (
+                    student.warningHistory.map((w: ApiData) => (
                       <tr key={w.id} className="hover:bg-slate-50 transition-colors">
                         <td className="py-3 px-4 font-mono text-slate-600">
                           {w.createdAt ? new Date(w.createdAt).toLocaleString("vi-VN") : "—"}
@@ -1293,7 +1387,7 @@ export default function StudentDetailPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {student.warningActions.map((act: any) => (
+                  {student.warningActions.map((act: ApiData) => (
                     <div key={act.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-start justify-between gap-3">
                       <div className="space-y-1 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">

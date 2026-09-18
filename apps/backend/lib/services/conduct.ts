@@ -19,6 +19,10 @@ export function conductApproval(statusId: string | null, lastScore: unknown) {
   return { code: "unknown", label: "Chưa xác định" };
 }
 
+export function isSummerConductTerm(termCode: string | null | undefined, sourceFlag = false) {
+  return sourceFlag || termCode?.trim().toUpperCase() === "HK03";
+}
+
 function numberOrNull(value: unknown) {
   return value == null ? null : Number(value);
 }
@@ -37,7 +41,7 @@ function serialize(record: {
   sourceUpdateStaff: string | null;
   createdAt: Date;
   updatedAt: Date;
-}, period?: { yearCode: string; termCode: string; termName: string }) {
+}, period?: { yearCode: string; termCode: string; termName: string; isSummer: boolean }) {
   const recognizedScore = record.statusId === "1" ? numberOrNull(record.lastScore) : null;
   return {
     id: record.id,
@@ -46,6 +50,7 @@ function serialize(record: {
     academicYear: period?.yearCode || null,
     termCode: period?.termCode || null,
     termName: period?.termName || null,
+    isSummer: isSummerConductTerm(period?.termCode, period?.isSummer),
     classCode: record.sClassStudentId,
     scores: {
       self: numberOrNull(record.studentScore),
@@ -77,9 +82,9 @@ export class ConductService {
     });
     const termIds = [...new Set(records.map((record) => record.academicTermId))];
     const terms = termIds.length ? await prisma.$queryRaw<Array<{
-      id: string; s_term_code: string; s_term_name: string; s_year_code: string; s_term_order: number;
+      id: string; s_term_code: string; s_term_name: string; s_year_code: string; s_term_order: number; s_is_summer: boolean;
     }>>`
-      SELECT t.id::text, t.s_term_code, t.s_term_name, y.s_year_code, t.s_term_order
+      SELECT t.id::text, t.s_term_code, t.s_term_name, y.s_year_code, t.s_term_order, t.s_is_summer
       FROM academic_terms t JOIN academic_years y ON y.id = t.academic_year_id
       WHERE t.id = ANY(${termIds}::uuid[])
     ` : [];
@@ -87,6 +92,7 @@ export class ConductService {
       yearCode: term.s_year_code,
       termCode: term.s_term_code,
       termName: term.s_term_name,
+      isSummer: term.s_is_summer,
       order: Number(term.s_term_order),
     }]));
     const items = records

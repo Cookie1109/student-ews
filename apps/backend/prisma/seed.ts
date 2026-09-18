@@ -37,6 +37,7 @@ const permissions = [
   ["academic_warning.policy.manage", "Quản lý chính sách cảnh báo", "academic_warning_policy", "manage"],
   ["academic_warning.action.create", "Tạo hồ sơ hỗ trợ", "academic_warning_action", "create"],
   ["academic_warning.action.update", "Cập nhật hồ sơ hỗ trợ", "academic_warning_action", "update"],
+  ["report.export", "Xuất báo cáo", "report", "export"],
   ["user.manage", "Quản lý tài khoản", "user", "manage"],
   ["role.manage", "Quản lý vai trò và quyền", "role", "manage"],
   ["advisor_assignment.manage", "Quản lý phân công cố vấn", "advisor_assignment", "manage"],
@@ -74,6 +75,7 @@ async function seedRbac() {
     "academic_warning.read",
     "academic_warning.action.create",
     "academic_warning.action.update",
+    "report.export",
   ]);
   await prisma.rolePermission.createMany({
     data: permissionRows
