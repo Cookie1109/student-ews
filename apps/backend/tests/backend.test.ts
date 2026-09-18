@@ -11,7 +11,7 @@ import {
 } from "../lib/services/training-progress";
 import { hasInvalidUuidSegment, hasPermission, proxy, requiredPermission } from "../proxy";
 import { checkLoginAttempt, clearLoginFailures, loginAttemptKey, recordLoginFailure } from "../lib/auth/login-rate-limit";
-import { parseCredits, parseDecimal, parseScore10, parseScore4 } from "../lib/services/grades";
+import { gradeImportRowKey, GradesService, parseCredits, parseDecimal, parseScore10, parseScore4 } from "../lib/services/grades";
 import { parsePagination } from "../lib/utils/api-response";
 import { AuthService } from "../lib/services/auth";
 import { buildWarningTrend, selectLatestReportingPeriod, summarizeWarningTrend } from "../lib/services/reports";
@@ -20,7 +20,14 @@ import { POST as refreshRoute } from "../app/api/v1/auth/refresh/route";
 import { signAccessToken } from "../lib/auth/jwt";
 import { assertWarningActionTransition, parseWarningActionStatus } from "../lib/services/warning-actions";
 import { ApiError } from "../lib/utils/api-error";
-import { classifyConductScore, conductApproval } from "../lib/services/conduct";
+import { classifyConductScore, conductApproval, isSummerConductTerm } from "../lib/services/conduct";
+import {
+  buildExportFileName,
+  parseExportParameter,
+  reportPdfBuffer,
+  safeExportStem,
+  workbookBuffer,
+} from "../lib/services/export";
 
 const IDS = {
   student: "11111111-1111-4111-8111-111111111111",
@@ -40,6 +47,27 @@ test("API permission policy follows the Phase 2 contract", () => {
   assert.equal(requiredPermission("/api/v1/training-progress/completion-runs/preview", "POST"), "progress.calculate");
   assert.equal(requiredPermission("/api/v1/academic-warnings/actions", "POST"), "academic_warning.action.create");
   assert.equal(requiredPermission(`/api/v1/academic-warnings/actions/${IDS.plan}`, "PATCH"), "academic_warning.action.update");
+  assert.equal(requiredPermission("/api/v1/reports/export", "GET"), "report.export");
+});
+
+test("Phase 3 export helpers produce real XLSX/PDF files and safe names", async () => {
+  const table = {
+    title: "Báo cáo thử nghiệm",
+    sheetName: "Dữ liệu",
+    columns: [
+      { header: "MSSV", key: "studentCode" },
+      { header: "Họ và tên", key: "studentName" },
+    ],
+    rows: [{ studentCode: "SV001", studentName: "Nguyễn Văn An" }],
+  };
+  const xlsx = await workbookBuffer(table);
+  assert.equal(xlsx.subarray(0, 2).toString("ascii"), "PK");
+  const pdf = await reportPdfBuffer(table);
+  assert.equal(pdf.subarray(0, 4).toString("ascii"), "%PDF");
+  assert.equal(safeExportStem("Hồ sơ: SV/001"), "Ho_so_SV_001");
+  assert.equal(buildExportFileName("warnings", "xlsx", new Date("2026-09-19T00:00:00Z")), "bao_cao_canh_bao_2026-09-19.xlsx");
+  assert.equal(parseExportParameter("pdf", ["xlsx", "pdf"] as const, "format"), "pdf");
+  assert.throws(() => parseExportParameter("csv", ["xlsx", "pdf"] as const, "format"), /format must be one of/);
 });
 
 function apiOperations(): Set<string> {
@@ -222,6 +250,28 @@ test("grade import rejects malformed numeric data instead of silently storing nu
   assert.throws(() => parseDecimal("NaN", 0, 10, "gpa"), /Invalid gpa/);
 });
 
+test("grade import identity deduplicates repeated rows without merging two programs", () => {
+  const grade = {
+    StudentID: " SV001 ", StudyProgramID: "CTDT-A", CurriculumID: "HP001",
+    StudyUnitID: "UNIT-1", ScheduleStudyUnitID: "SCHEDULE-1", Credits: "3",
+  };
+  const key = gradeImportRowKey("2025-2026", "hk01", grade);
+  assert.equal(key, gradeImportRowKey("2025-2026", "HK01", grade));
+  assert.notEqual(key, gradeImportRowKey("2025-2026", "HK01", { ...grade, StudyProgramID: "CTDT-B" }));
+  assert.equal(new Set([key, key]).size, 1);
+});
+
+test("grade import rejects missing year, term and source identifiers before persistence", async () => {
+  await assert.rejects(() => GradesService.importGrades([{ NamHoc: "2025", DanhSachDiem: [] }]), /Invalid year format/);
+  await assert.rejects(() => GradesService.importGrades([{
+    NamHoc: "2025-2026", DanhSachDiem: [{ HocKy: "HK04", DanhSachDiemHK: [] }],
+  }]), /Invalid term code/);
+  await assert.rejects(() => GradesService.importGrades([{
+    NamHoc: "2025-2026",
+    DanhSachDiem: [{ HocKy: "HK01", DanhSachDiemHK: [{ StudentID: "", StudyProgramID: "A", CurriculumID: "HP", StudyUnitID: "", Credits: "3" }] }],
+  }]), /StudentID, CurriculumID, and StudyUnitID are required/);
+});
+
 test("admin and explicit grants authorize; unrelated grants do not", () => {
   const base = { sub: "u", username: "u", jti: "j", scopes: [], permissions: [] };
   assert.equal(hasPermission({ ...base, roles: ["admin"] }, "student.delete"), true);
@@ -257,6 +307,22 @@ test("progress evaluation detects missing, outside-plan, and elective-credit gap
   assert.equal(result.status, "fail");
   assert.equal(result.missingMandatoryCourses, 1);
   assert.equal(result.missingCredits, 1);
+});
+
+test("progress evaluation handles repeated registrations, outside credits and elective alternatives", () => {
+  const outside = { courseId: IDS.courseB, courseCode: "OUT", courseName: "Ngoài CTĐT", credits: 3 };
+  const result = evaluateProgress([
+    { courseId: IDS.courseA, courseCode: "A1", courseName: "Tự chọn 1", credits: 2, requirementType: "elective", choiceGroupCode: "ALT", isRegistrationRequired: false },
+    { courseId: IDS.plan, courseCode: "A2", courseName: "Tự chọn 2", credits: 2, requirementType: "elective", choiceGroupCode: "ALT", isRegistrationRequired: false },
+  ], [
+    { courseId: IDS.courseA, courseCode: "A1", courseName: "Tự chọn 1", credits: 2 },
+    outside,
+    outside,
+  ], false);
+  assert.equal(result.status, "pass");
+  assert.equal(result.choiceGroupResults[0].status, "pass");
+  assert.equal(result.outsidePlanCourses, 1);
+  assert.equal(result.outsidePlanCredits, 3);
 });
 
 test("completion distinguishes pending results from forecast assumptions", () => {
@@ -327,6 +393,34 @@ test("warning evaluation promotes high-severity cumulative GPA and decision reas
   assert.equal(result.reasons[1].sourceType, "student_cumulative_summary");
 });
 
+test("warning thresholds are exclusive and missing GPA is never treated as safe evidence", () => {
+  const student = {
+    id: IDS.student, classId: null, cohortId: null, code: "SV001", name: "Sinh viên",
+    classCode: "", className: "", programCode: "CNTT",
+  };
+  const exactBoundary = new Map([[IDS.student, {
+    termSummaryId: IDS.term,
+    cumulativeSummaryId: IDS.courseA,
+    registered: 12,
+    termGPA4: 2,
+    termGPA10: null,
+    cumulativeGPA4: 2,
+    cumulativeGPA10: null,
+  }]]);
+  const boundary = evaluate(student, new Map(), new Map(), exactBoundary, new Map(), {
+    termGpaThreshold: 2, cumulativeGpaThreshold: 2,
+  });
+  assert.equal(boundary.reasonCount, 0);
+  assert.equal(boundary.dataError, null);
+
+  const missing = evaluate(student, new Map(), new Map(), new Map(), new Map(), {
+    termGpaThreshold: 2, cumulativeGpaThreshold: 2,
+  });
+  assert.equal(missing.reasonCount, 0);
+  assert.equal(missing.maxSeverity, "none");
+  assert.equal(missing.dataError, "missing student term summary");
+});
+
 test("conduct scores use S5 classification boundaries and explicit approval mapping", () => {
   assert.equal(classifyConductScore(100), "Xuất sắc");
   assert.equal(classifyConductScore(90), "Xuất sắc");
@@ -338,6 +432,9 @@ test("conduct scores use S5 classification boundaries and explicit approval mapp
   assert.equal(classifyConductScore(34), "Kém");
   assert.equal(conductApproval("1", 49).code, "approved");
   assert.equal(conductApproval("0", null).code, "pending");
+  assert.equal(isSummerConductTerm("HK03"), true);
+  assert.equal(isSummerConductTerm("HK02", true), true);
+  assert.equal(isSummerConductTerm("HK02"), false);
 });
 
 test("warning evaluation adds LOW_CONDUCT_SCORE only for approved recognized scores", () => {

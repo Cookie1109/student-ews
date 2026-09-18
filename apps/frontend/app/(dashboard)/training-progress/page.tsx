@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Tabs from "@/components/ui/Tabs";
-import FilterBar from "@/components/ui/FilterBar";
 import SlideOverDrawer from "@/components/ui/SlideOverDrawer";
 import { useAuthStore } from "@/stores/authStore";
 
@@ -10,14 +9,14 @@ export default function TrainingProgressPage() {
   const { can } = useAuthStore();
   const [activeTab, setActiveTab] = useState<"plans" | "runs">("plans");
   const [loading, setLoading] = useState(true);
-  const [plans, setPlans] = useState<any[]>([]);
-  const [runs, setRuns] = useState<any[]>([]);
+  const [plans, setPlans] = useState<ApiData[]>([]);
+  const [runs, setRuns] = useState<ApiData[]>([]);
 
   // Drawer state for run report
-  const [selectedRun, setSelectedRun] = useState<any | null>(null);
+  const [selectedRun, setSelectedRun] = useState<ApiData | null>(null);
   const [drawerTab, setDrawerTab] = useState<"students" | "classes" | "cohort">("students");
-  const [runStudents, setRunStudents] = useState<any[]>([]);
-  const [runClasses, setRunClasses] = useState<any[]>([]);
+  const [runStudents, setRunStudents] = useState<ApiData[]>([]);
+  const [runClasses, setRunClasses] = useState<ApiData[]>([]);
   const [studentStatusFilter, setStudentStatusFilter] = useState<string>("all");
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -81,7 +80,7 @@ export default function TrainingProgressPage() {
     }
   };
 
-  const handleOpenRunReport = async (run: any) => {
+  const handleOpenRunReport = async (run: ApiData) => {
     setSelectedRun(run);
     setDrawerTab("students");
     try {
@@ -144,7 +143,7 @@ export default function TrainingProgressPage() {
           { id: "runs", label: "Lịch sử chạy tiến độ", badge: runs.length },
         ]}
         activeTab={activeTab}
-        onChange={(id) => setActiveTab(id as any)}
+        onChange={(id) => setActiveTab(id as ApiData)}
       />
 
       {loading ? (

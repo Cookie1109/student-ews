@@ -18,7 +18,6 @@ interface FilterState {
   warningLevel?: string;
   supportStatus?: string;
 }
-
 interface DashboardMetric {
   value: number | null;
   numerator?: number;
@@ -73,24 +72,23 @@ export default function DashboardPage() {
   const [registrationBreakdown, setRegistrationBreakdown] = useState<"program" | "cohort">("program");
 
   // Options
-  const [academicYears, setAcademicYears] = useState<any[]>([]);
-  const [programs, setPrograms] = useState<any[]>([]);
-  const [classes, setClasses] = useState<any[]>([]);
-  const [summaryData, setSummaryData] = useState<any>(null);
-  const [warningStudents, setWarningStudents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [academicYears, setAcademicYears] = useState<ApiData[]>([]);
+  const [programs, setPrograms] = useState<ApiData[]>([]);
+  const [classes, setClasses] = useState<ApiData[]>([]);
+  const [summaryData, setSummaryData] = useState<ApiData>(null);
+  const [warningStudents, setWarningStudents] = useState<ApiData[]>([]);
   const [mounted, setMounted] = useState(false);
 
   // Recharts needs to render after client hydration.
   useEffect(() => {
-    setMounted(true);
+    const frame = window.requestAnimationFrame(() => setMounted(true));
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   useEffect(() => {
     const controller = new AbortController();
     async function loadSummary() {
       try {
-        setLoading(true);
         const params = new URLSearchParams({
           gpaScope: filters.gpaScope,
           gpaAggregation: filters.gpaAggregation,
@@ -131,7 +129,7 @@ export default function DashboardPage() {
           console.error("Dashboard summary load error:", err);
         }
       } finally {
-        if (!controller.signal.aborted) setLoading(false);
+        // Loading placeholders are driven by the presence of summary data.
       }
     }
     void loadSummary();
@@ -281,7 +279,7 @@ export default function DashboardPage() {
           className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
         >
           <option value="">Tất cả học kỳ</option>
-          {termOptions.map((t: any) => (
+          {termOptions.map((t: ApiData) => (
             <option key={t.id} value={t.sTermCode || t.termCode}>
               {t.sTermCode || t.termCode} - {t.sTermName || t.termName}
             </option>
@@ -601,7 +599,7 @@ export default function DashboardPage() {
                   <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748B" }} />
                   <YAxis domain={[0, 4]} tick={{ fontSize: 11, fill: "#64748B" }} />
                   <Tooltip
-                    formatter={(val: any) => [Number(val).toFixed(2), "GPA học kỳ TB"]}
+                    formatter={(val: ApiData) => [Number(val).toFixed(2), "GPA học kỳ TB"]}
                     contentStyle={{ borderRadius: 12, border: "1px solid #E2E8F0", fontSize: 12 }}
                   />
                   <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
@@ -670,7 +668,7 @@ export default function DashboardPage() {
                   <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11, fill: "#64748B" }} />
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#64748B" }} width={60} />
                   <Tooltip
-                    formatter={(val: any) => [`${val}%`, ""]}
+                    formatter={(val: ApiData) => [`${val}%`, ""]}
                     contentStyle={{ borderRadius: 12, border: "1px solid #E2E8F0", fontSize: 12 }}
                   />
                   <Legend wrapperStyle={{ fontSize: 12, paddingTop: 4 }} />
@@ -734,7 +732,7 @@ export default function DashboardPage() {
                   <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11, fill: "#64748B" }} />
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#64748B" }} width={60} />
                   <Tooltip
-                    formatter={(val: any) => [`${val}%`, ""]}
+                    formatter={(val: ApiData) => [`${val}%`, ""]}
                     contentStyle={{ borderRadius: 12, border: "1px solid #E2E8F0", fontSize: 12 }}
                   />
                   <Legend wrapperStyle={{ fontSize: 12, paddingTop: 4 }} />
@@ -806,7 +804,7 @@ export default function DashboardPage() {
                   <XAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "#64748B" }} />
                   <YAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: "#64748B" }} />
                   <Tooltip
-                    formatter={(val: any) => [val, "Sinh viên"]}
+                    formatter={(val: ApiData) => [val, "Sinh viên"]}
                     contentStyle={{ borderRadius: 12, border: "1px solid #E2E8F0", fontSize: 12 }}
                   />
                   <Bar dataKey="count" name="Sinh viên" fill={THEME_COLORS.purple} radius={[6, 6, 0, 0]} />

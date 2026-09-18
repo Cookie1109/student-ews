@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuthStore, ROLE_USER_PRESETS } from "@/stores/authStore";
 
 interface HeaderProps {
@@ -10,6 +11,7 @@ interface HeaderProps {
 }
 
 export default function Header({ title = "Cổng quản trị CNTT", onMenuToggle }: HeaderProps) {
+  const router = useRouter();
   const { user, logout } = useAuthStore();
   const userInfo = user
     ? {
@@ -148,7 +150,7 @@ export default function Header({ title = "Cổng quản trị CNTT", onMenuToggl
           {/* Logout button */}
           <button
             type="button"
-            onClick={() => void logout()}
+            onClick={() => void logout().then(() => router.replace("/login"))}
             className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
             title="Đăng xuất khỏi hệ thống"
           >

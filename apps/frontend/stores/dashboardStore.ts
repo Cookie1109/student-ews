@@ -8,7 +8,7 @@ interface DashboardState {
   // TODO: Add functions to fetch or update these stats
 }
 
-export const useDashboardStore = create<DashboardState>((set) => ({
+export const useDashboardStore = create<DashboardState>(() => ({
   totalStudents: 0,
   redWarnings: 0,
   yellowWarnings: 0,

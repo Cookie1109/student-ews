@@ -92,7 +92,7 @@ export default function Breadcrumb() {
         <span className="font-medium hidden sm:inline" style={{ fontFamily: "Outfit, sans-serif" }}>Tổng quan</span>
       </Link>
 
-      {items.map((item, idx) => (
+      {items.map((item) => (
         <div key={item.href} className="flex items-center space-x-1.5 flex-shrink-0">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
             <polyline points="9 18 15 12 9 6"/>

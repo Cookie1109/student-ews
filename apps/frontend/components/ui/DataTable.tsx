@@ -8,9 +8,8 @@ export interface Column<T> {
   width?: string | number;
   className?: string;
   align?: "left" | "center" | "right";
-  render?: (value: any, record: T, index: number) => React.ReactNode;
+  render?: (value: ApiData, record: T, index: number) => React.ReactNode;
 }
-
 interface DataTableProps<T> {
   columns: Column<T>[];
   data: T[];
@@ -27,7 +26,7 @@ interface DataTableProps<T> {
   onRowClick?: (record: T) => void;
 }
 
-export default function DataTable<T extends Record<string, any>>({
+export default function DataTable<T extends Record<string, ApiData>>({
   columns,
   data,
   rowKey,

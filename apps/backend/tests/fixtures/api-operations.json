@@ -45,6 +45,7 @@
   "GET /rbac/users",
   "GET /rbac/users/{param}/roles",
   "GET /reports/academic-warnings",
+  "GET /reports/export",
   "GET /students",
   "GET /students/export",
   "GET /students/{param}",

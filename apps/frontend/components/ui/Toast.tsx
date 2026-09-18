@@ -9,7 +9,6 @@ interface ToastItem {
   type: ToastType;
   message: string;
 }
-
 export const toast = {
   success: (message: string) => emitToast("success", message),
   error: (message: string) => emitToast("error", message),
@@ -29,7 +28,7 @@ export default function ToastContainer() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   useEffect(() => {
-    const handleToast = (e: any) => {
+    const handleToast = (e: ApiData) => {
       const { type, message } = e.detail || {};
       const id = Math.random().toString(36).substring(2, 9);
       setToasts((prev) => [...prev, { id, type, message }]);

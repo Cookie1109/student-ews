@@ -67,6 +67,34 @@ async function main() {
     assert.equal(proxiedStudents.status, 200);
     assert.deepEqual(await proxiedStudents.json(), await directStudents.json());
     console.log("PASS authenticated session, dashboard and paginated API forwarding");
+
+    const conductStudentId = process.env.SMOKE_STUDENT_ID;
+    if (conductStudentId) {
+      const conduct = await request(frontend, `/api/v1/students/${encodeURIComponent(conductStudentId)}/conduct`, { headers });
+      assert.equal(conduct.status, 200, "test account needs student.read for conduct smoke test");
+      const conductPayload = await conduct.json();
+      assert.ok(Array.isArray(conductPayload.items), "conduct response contains items");
+      console.log("PASS conduct profile endpoint");
+    } else {
+      console.log("SKIP conduct profile: set SMOKE_STUDENT_ID");
+    }
+
+    const completionRuns = await request(frontend, "/api/v1/training-progress/completion-runs?pageSize=1", { headers });
+    assert.equal(completionRuns.status, 200, "test account needs progress.read for graduation forecast smoke test");
+    console.log("PASS graduation forecast completion-run endpoint");
+
+    if (process.env.SMOKE_EXPORTS === "1") {
+      const xlsx = await request(frontend, "/api/v1/reports/export?format=xlsx&type=warnings", { headers });
+      assert.equal(xlsx.status, 200, "test account needs report.export");
+      assert.match(xlsx.headers.get("content-type") || "", /spreadsheetml/);
+      assert.equal(Buffer.from(await xlsx.arrayBuffer()).subarray(0, 2).toString("ascii"), "PK");
+      const pdf = await request(frontend, "/api/v1/reports/export?format=pdf&type=warnings", { headers });
+      assert.equal(pdf.status, 200, "test account needs report.export");
+      assert.equal(Buffer.from(await pdf.arrayBuffer()).subarray(0, 4).toString("ascii"), "%PDF");
+      console.log("PASS XLSX and PDF report export (audit entries created)");
+    } else {
+      console.log("SKIP export smoke: set SMOKE_EXPORTS=1 (creates report.export audit entries)");
+    }
   } else {
     console.log("SKIP authenticated reads: set SMOKE_ACCESS_TOKEN for a test account with student.read");
   }

@@ -28,7 +28,6 @@ interface StudentItem {
   permanentResidence?: string;
   warningLevel?: WarningLevel;
 }
-
 export default function StudentsPage() {
   const router = useRouter();
 
@@ -43,13 +42,12 @@ export default function StudentsPage() {
   const [search, setSearch] = useState("");
   const [filterClass, setFilterClass] = useState("all");
   const [filterGender, setFilterGender] = useState("all");
-  const [filterRole, setFilterRole] = useState("all");
   const [filterInClass, setFilterInClass] = useState("all");
   const [filterWarning, setFilterWarning] = useState("all");
 
   // Options
-  const [classList, setClassList] = useState<any[]>([]);
-  const [programList, setProgramList] = useState<any[]>([]);
+  const [classList, setClassList] = useState<ApiData[]>([]);
+  const [programList, setProgramList] = useState<ApiData[]>([]);
 
   // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
@@ -120,7 +118,7 @@ export default function StudentsPage() {
       const res = await fetch(`/api/v1/students?${params.toString()}`);
       if (res.ok) {
         const json = await res.json();
-        const items = (json.items || []).map((s: any) => ({
+        const items = (json.items || []).map((s: ApiData) => ({
           id: s.id,
           studentId: s.studentId || s.studentCode || s.sStudentId || s.id,
           studentCode: s.studentCode || s.studentId || s.sStudentId || s.id,
@@ -151,7 +149,8 @@ export default function StudentsPage() {
   }, [page, pageSize, search, filterClass, filterGender, filterInClass, filterWarning]);
 
   useEffect(() => {
-    fetchStudents();
+    const timeout = window.setTimeout(() => void fetchStudents(), 0);
+    return () => window.clearTimeout(timeout);
   }, [fetchStudents]);
 
   // Handle Create Student
@@ -191,7 +190,7 @@ export default function StudentsPage() {
         const err = await res.json();
         alert(err.error?.message || "Lỗi khi thêm sinh viên");
       }
-    } catch (err: any) {
+    } catch (err: ApiData) {
       alert(err.message || "Lỗi kết nối");
     } finally {
       setFormSubmitting(false);
@@ -239,7 +238,7 @@ export default function StudentsPage() {
         const err = await res.json();
         alert(err.error?.message || "Lỗi khi cập nhật");
       }
-    } catch (err: any) {
+    } catch (err: ApiData) {
       alert(err.message || "Lỗi kết nối");
     } finally {
       setFormSubmitting(false);
@@ -281,7 +280,7 @@ export default function StudentsPage() {
         a.click();
         a.remove();
       }
-    } catch (err) {
+    } catch {
       alert("Lỗi khi xuất danh sách sinh viên");
     }
   };
@@ -311,7 +310,7 @@ export default function StudentsPage() {
       } else {
         alert(json.error?.message || "Lỗi khi import");
       }
-    } catch (err: any) {
+    } catch (err: ApiData) {
       alert(err.message || "Lỗi xử lý import");
     } finally {
       setImportLoading(false);

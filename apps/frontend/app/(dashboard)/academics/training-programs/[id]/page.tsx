@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, use } from "react";
+import { useState, useEffect, useMemo, useCallback, use } from "react";
 import { useRouter } from "next/navigation";
 import FilterBar from "@/components/ui/FilterBar";
 import SlideOverDrawer from "@/components/ui/SlideOverDrawer";
@@ -25,7 +25,6 @@ interface ProgramCourse {
   academicYearId?: string | null;
   academicTermId?: string | null;
 }
-
 interface TrainingProgramDetail {
   id: string;
   programCode: string;
@@ -47,7 +46,7 @@ export default function TrainingProgramDetailPage({
   const programId = resolvedParams.id;
 
   const [program, setProgram] = useState<TrainingProgramDetail | null>(null);
-  const [plans, setPlans] = useState<any[]>([]);
+  const [plans, setPlans] = useState<ApiData[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"curriculum" | "plans">("curriculum");
 
@@ -78,16 +77,15 @@ export default function TrainingProgramDetailPage({
   });
 
   // Catalog courses for quick pick
-  const [catalogCourses, setCatalogCourses] = useState<any[]>([]);
-  const [academicYears, setAcademicYears] = useState<any[]>([]);
-  const [availableTerms, setAvailableTerms] = useState<any[]>([]);
+  const [catalogCourses, setCatalogCourses] = useState<ApiData[]>([]);
+  const [academicYears, setAcademicYears] = useState<ApiData[]>([]);
 
   // Delete Confirm
   const [deleteTarget, setDeleteTarget] = useState<ProgramCourse | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Load Program Data
-  const loadProgramData = async () => {
+  const loadProgramData = useCallback(async () => {
     try {
       setLoading(true);
       const [pRes, plRes, cRes, yRes] = await Promise.all([
@@ -112,27 +110,18 @@ export default function TrainingProgramDetailPage({
         const yJson = await yRes.json();
         const years = Array.isArray(yJson.items) ? yJson.items : Array.isArray(yJson) ? yJson : [];
         setAcademicYears(years);
-        if (years.length > 0 && years[0].terms) {
-          setAvailableTerms(years[0].terms);
-        }
       }
     } catch (err) {
       console.error("Error loading program details:", err);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadProgramData();
   }, [programId]);
 
-  // Handle year select change in drawer form
-  const handleYearChange = (yearId: string) => {
-    setFormData((prev) => ({ ...prev, academicYearId: yearId, academicTermId: "" }));
-    const selectedYear = academicYears.find((y) => y.id === yearId);
-    setAvailableTerms(selectedYear?.terms || []);
-  };
+  useEffect(() => {
+    const timeout = window.setTimeout(() => void loadProgramData(), 0);
+    return () => window.clearTimeout(timeout);
+  }, [loadProgramData]);
 
   // Open Drawer for Create
   const handleOpenCreate = () => {
@@ -152,7 +141,6 @@ export default function TrainingProgramDetailPage({
       academicYearId: academicYears[0]?.id || "",
       academicTermId: academicYears[0]?.terms?.[0]?.id || "",
     });
-    setAvailableTerms(academicYears[0]?.terms || []);
     setIsDrawerOpen(true);
   };
 
@@ -160,8 +148,6 @@ export default function TrainingProgramDetailPage({
   const handleOpenEdit = (course: ProgramCourse) => {
     setEditingCourse(course);
     const yId = course.academicYearId || academicYears[0]?.id || "";
-    const selectedYear = academicYears.find((y) => y.id === yId);
-    setAvailableTerms(selectedYear?.terms || []);
 
     setFormData({
       courseId: course.courseId || "",
@@ -261,7 +247,7 @@ export default function TrainingProgramDetailPage({
   };
 
   // Filtered courses
-  const allCourses = program?.courses || [];
+  const allCourses = useMemo(() => program?.courses || [], [program?.courses]);
   const filteredCourses = useMemo(() => {
     return allCourses.filter((c) => {
       const matchQuery =

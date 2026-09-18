@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import FilterBar from "@/components/ui/FilterBar";
 import SlideOverDrawer from "@/components/ui/SlideOverDrawer";
 import Modal from "@/components/ui/Modal";
 import { useAuthStore } from "@/stores/authStore";
@@ -14,21 +13,21 @@ const completionStatusMeta = (status: string) => {
 
 export default function GraduationForecastPage() {
   const { can } = useAuthStore();
-  const [runs, setRuns] = useState<any[]>([]);
+  const [runs, setRuns] = useState<ApiData[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Selected run & Drawer state
-  const [selectedRun, setSelectedRun] = useState<any | null>(null);
-  const [students, setStudents] = useState<any[]>([]);
-  const [selectedStudentDetail, setSelectedStudentDetail] = useState<any | null>(null);
+  const [selectedRun, setSelectedRun] = useState<ApiData | null>(null);
+  const [students, setStudents] = useState<ApiData[]>([]);
+  const [selectedStudentDetail, setSelectedStudentDetail] = useState<ApiData | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   // Trigger modal state
   const [showModal, setShowModal] = useState(false);
   const [triggerLoading, setTriggerLoading] = useState(false);
-  const [cohorts, setCohorts] = useState<any[]>([]);
-  const [programs, setPrograms] = useState<any[]>([]);
-  const [years, setYears] = useState<any[]>([]);
+  const [cohorts, setCohorts] = useState<ApiData[]>([]);
+  const [programs, setPrograms] = useState<ApiData[]>([]);
+  const [years, setYears] = useState<ApiData[]>([]);
   const [selectedCohort, setSelectedCohort] = useState("");
   const [selectedProgram, setSelectedProgram] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
@@ -70,7 +69,7 @@ export default function GraduationForecastPage() {
     loadInitial();
   }, []);
 
-  const handleOpenRunReport = async (run: any) => {
+  const handleOpenRunReport = async (run: ApiData) => {
     setSelectedRun(run);
     try {
       const res = await fetch(`/api/v1/training-progress/completion/runs/${run.id}/students`);
@@ -122,7 +121,7 @@ export default function GraduationForecastPage() {
         const err = await res.json();
         alert(err.error?.message || "Lỗi khi chạy đánh giá");
       }
-    } catch (e: any) {
+    } catch (e: ApiData) {
       alert(e.message || "Lỗi xử lý");
     } finally {
       setTriggerLoading(false);
@@ -430,7 +429,7 @@ export default function GraduationForecastPage() {
                 className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800"
               >
                 <option value="">Chọn học kỳ</option>
-                {termsForSelectedYear.map((t: any) => (
+                {termsForSelectedYear.map((t: ApiData) => (
                   <option key={t.id} value={t.id}>
                     {t.sTermCode || t.termCode}
                   </option>
@@ -459,7 +458,7 @@ export default function GraduationForecastPage() {
                 <div className="flex items-start gap-1.5 text-blue-700 bg-blue-50/70 p-2 rounded-lg border border-blue-150">
                   <span className="font-bold text-blue-800 shrink-0">ℹ️ Thông tin:</span>
                   <span>
-                    Đánh giá hoàn thành CTĐT tại kỳ được chọn; các môn học chưa có điểm chính thức sẽ được giả định là đạt và đánh dấu riêng "Đạt có điều kiện". Kết quả không phải quyết định đủ điều kiện tốt nghiệp.
+                    Đánh giá hoàn thành CTĐT tại kỳ được chọn; các môn học chưa có điểm chính thức sẽ được giả định là đạt và đánh dấu riêng &quot;Đạt có điều kiện&quot;. Kết quả không phải quyết định đủ điều kiện tốt nghiệp.
                   </span>
                 </div>
                 <div className="flex items-start gap-1.5 text-amber-800 bg-amber-50/70 p-2 rounded-lg border border-amber-200">
@@ -511,7 +510,7 @@ export default function GraduationForecastPage() {
             </div>
 
             <div className="space-y-3 max-h-[360px] overflow-y-auto">
-              {(selectedStudentDetail.plans || []).map((plan: any) => (
+              {(selectedStudentDetail.plans || []).map((plan: ApiData) => (
                 <div key={plan.id} className="p-3 border border-slate-200 rounded-xl space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-800">
@@ -523,7 +522,7 @@ export default function GraduationForecastPage() {
                   </div>
 
                   <div className="space-y-1">
-                    {(plan.courses || []).map((c: any) => (
+                    {(plan.courses || []).map((c: ApiData) => (
                       <div key={c.courseId} className="flex items-center justify-between text-xs py-1 border-b border-slate-50 last:border-0">
                         <span className="font-medium text-slate-700">{c.courseCode} - {c.courseName}</span>
                         <span className={`text-[11px] font-semibold ${

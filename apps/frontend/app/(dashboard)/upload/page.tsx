@@ -100,7 +100,7 @@ export default function UploadPage() {
   const [fileContent, setFileContent] = useState("");
   const [fileName, setFileName] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [importResult, setImportResult] = useState<any | null>(null);
+  const [importResult, setImportResult] = useState<ApiData | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
   const availableCategories = (Object.entries(categoryConfig) as [UploadCategory, typeof categoryConfig.grades][])
@@ -157,14 +157,14 @@ export default function UploadPage() {
       return;
     }
 
-    let parsedData: any;
+    let parsedData: ApiData;
     try {
       parsedData = JSON.parse(fileContent);
       if (!Array.isArray(parsedData)) {
         alert("Dữ liệu nhập vào phải là một danh sách dạng mảng JSON [...]");
         return;
       }
-    } catch (e: any) {
+    } catch (e: ApiData) {
       alert("Định dạng dữ liệu không hợp lệ. Vui lòng kiểm tra cú pháp JSON: " + e.message);
       return;
     }
@@ -193,7 +193,7 @@ export default function UploadPage() {
           error: json.error?.message || "Lỗi trong quá trình xử lý nhập dữ liệu",
         });
       }
-    } catch (err: any) {
+    } catch (err: ApiData) {
       setImportResult({
         success: false,
         error: err.message || "Lỗi kết nối tới máy chủ",
@@ -397,7 +397,7 @@ export default function UploadPage() {
             )}
             {importResult.errors && importResult.errors.length > 0 && (
               <div className="pt-2 border-t border-emerald-200/60 font-mono text-[11px] text-emerald-800 max-h-32 overflow-y-auto">
-                {importResult.errors.map((err: any, i: number) => (
+                {importResult.errors.map((err: ApiData, i: number) => (
                   <div key={i}>
                     • {typeof err === "string"
                       ? err

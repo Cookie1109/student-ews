@@ -8,7 +8,7 @@ interface FilterState {
   status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'ESCALATED' | 'CLOSED' | null;
   ruleCode: string | null;
   searchQuery: string;
-  setFilter: (key: keyof Omit<FilterState, 'setFilter' | 'clearFilters'>, value: any) => void;
+  setFilter: (key: keyof Omit<FilterState, 'setFilter' | 'clearFilters'>, value: ApiData) => void;
   clearFilters: () => void;
 }
 

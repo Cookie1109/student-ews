@@ -14,14 +14,14 @@ export default function AcademicsPage() {
   const [loading, setLoading] = useState(true);
 
   // Data collections
-  const [years, setYears] = useState<any[]>([]);
+  const [years, setYears] = useState<ApiData[]>([]);
   const [selectedYearId, setSelectedYearId] = useState<string>("");
-  const [terms, setTerms] = useState<any[]>([]);
-  const [programs, setPrograms] = useState<any[]>([]);
-  const [courses, setCourses] = useState<any[]>([]);
-  const [classes, setClasses] = useState<any[]>([]);
-  const [cohorts, setCohorts] = useState<any[]>([]);
-  const [plans, setPlans] = useState<any[]>([]);
+  const [terms, setTerms] = useState<ApiData[]>([]);
+  const [programs, setPrograms] = useState<ApiData[]>([]);
+  const [courses, setCourses] = useState<ApiData[]>([]);
+  const [classes, setClasses] = useState<ApiData[]>([]);
+  const [cohorts, setCohorts] = useState<ApiData[]>([]);
+  const [plans, setPlans] = useState<ApiData[]>([]);
 
   // Search in tabs
   const [searchQuery, setSearchQuery] = useState("");
@@ -49,7 +49,7 @@ export default function AcademicsPage() {
   // Router and Plan Detail & Editor State
   const router = useRouter();
   const [showPlanCoursesModal, setShowPlanCoursesModal] = useState(false);
-  const [selectedPlanDetail, setSelectedPlanDetail] = useState<any | null>(null);
+  const [selectedPlanDetail, setSelectedPlanDetail] = useState<ApiData | null>(null);
   const [planCoursesLoading, setPlanCoursesLoading] = useState(false);
 
   const [showPlanEditorModal, setShowPlanEditorModal] = useState(false);
@@ -62,7 +62,7 @@ export default function AcademicsPage() {
     requiredElectiveCredits: 0,
     isProgramFinal: false,
   });
-  const [programCoursesForPlan, setProgramCoursesForPlan] = useState<any[]>([]);
+  const [programCoursesForPlan, setProgramCoursesForPlan] = useState<ApiData[]>([]);
   const [selectedPlanCourses, setSelectedPlanCourses] = useState<
     Record<string, { requirementType: string; choiceGroupCode: string; isRegistrationRequired: boolean }>
   >({});
@@ -86,9 +86,7 @@ export default function AcademicsPage() {
           const yData = await yRes.json();
           const items = Array.isArray(yData.items) ? yData.items : Array.isArray(yData) ? yData : [];
           setYears(items);
-          if (items.length > 0 && !selectedYearId) {
-            setSelectedYearId(items[0].id);
-          }
+          if (items.length > 0) setSelectedYearId((current) => current || items[0].id);
         }
         if (pRes.ok) {
           const pJson = await pRes.json();
@@ -116,7 +114,7 @@ export default function AcademicsPage() {
         setLoading(false);
       }
     }
-    loadData();
+    void loadData();
   }, []);
 
   // When selectedYearId changes, load terms for that year
@@ -165,7 +163,7 @@ export default function AcademicsPage() {
         if (yRes.ok) setYears(await yRes.json());
         alert("Đã thêm năm học thành công!");
       }
-    } catch (err) {
+    } catch {
       alert("Lỗi khi thêm năm học");
     }
   };
@@ -189,7 +187,7 @@ export default function AcademicsPage() {
         }
         alert("Đã thêm học kỳ thành công!");
       }
-    } catch (err) {
+    } catch {
       alert("Lỗi khi thêm học kỳ");
     }
   };
@@ -210,7 +208,7 @@ export default function AcademicsPage() {
         if (cRes.ok) setCourses(await cRes.json());
         alert("Đã thêm học phần thành công!");
       }
-    } catch (err) {
+    } catch {
       alert("Lỗi khi thêm học phần");
     }
   };
@@ -231,7 +229,7 @@ export default function AcademicsPage() {
         if (coRes.ok) setCohorts(await coRes.json());
         alert("Đã thêm khóa mới thành công!");
       }
-    } catch (err) {
+    } catch {
       alert("Lỗi khi thêm khóa");
     }
   };
@@ -252,7 +250,7 @@ export default function AcademicsPage() {
         if (clRes.ok) setClasses(await clRes.json());
         alert("Đã thêm lớp thành công!");
       }
-    } catch (err) {
+    } catch {
       alert("Lỗi khi thêm lớp");
     }
   };
@@ -318,8 +316,8 @@ export default function AcademicsPage() {
           const json = await res.json();
           const items = Array.isArray(json.items) ? json.items : Array.isArray(json) ? json : [];
           setProgramCoursesForPlan(items);
-          const initSelected: Record<string, any> = {};
-          items.forEach((c: any) => {
+          const initSelected: Record<string, ApiData> = {};
+          items.forEach((c: ApiData) => {
             if (c.semesterNo === 1) {
               initSelected[c.courseId] = {
                 requirementType: c.requirementType === "Tự Chọn" ? "elective" : "mandatory",
@@ -351,7 +349,7 @@ export default function AcademicsPage() {
     }
   };
 
-  const handleTogglePlanCourse = (c: any) => {
+  const handleTogglePlanCourse = (c: ApiData) => {
     setSelectedPlanCourses((prev) => {
       const next = { ...prev };
       if (next[c.courseId]) {
@@ -969,11 +967,11 @@ export default function AcademicsPage() {
                     {plans.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="py-8 text-center text-slate-400">
-                          Chưa có kế hoạch đào tạo nào được tạo. Nhấn "Tạo Kế hoạch mới" để bắt đầu.
+                          Chưa có kế hoạch đào tạo nào được tạo. Nhấn &quot;Tạo Kế hoạch mới&quot; để bắt đầu.
                         </td>
                       </tr>
                     ) : (
-                      plans.map((pl: any) => (
+                      plans.map((pl: ApiData) => (
                         <tr key={pl.id} className="hover:bg-slate-50/70 transition-colors">
                           <td className="py-3.5 px-4 font-bold text-slate-900">
                             <div>{pl.cohortCode || "Khóa"}</div>
@@ -1429,13 +1427,13 @@ export default function AcademicsPage() {
               <div className="bg-blue-50/70 p-3 rounded-xl border border-blue-200/80">
                 <div className="text-[10px] uppercase font-bold text-blue-500">Tổng tín chỉ</div>
                 <div className="text-lg font-bold font-mono text-blue-700">
-                  {selectedPlanDetail.courses?.reduce((s: number, c: any) => s + (c.credits || 0), 0) || 0} TC
+                  {selectedPlanDetail.courses?.reduce((s: number, c: ApiData) => s + (c.credits || 0), 0) || 0} TC
                 </div>
               </div>
               <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200/80">
                 <div className="text-[10px] uppercase font-bold text-emerald-500">Bắt buộc</div>
                 <div className="text-lg font-bold font-mono text-emerald-700">
-                  {selectedPlanDetail.courses?.filter((c: any) => c.requirementType === "mandatory").length || 0} HP
+                  {selectedPlanDetail.courses?.filter((c: ApiData) => c.requirementType === "mandatory").length || 0} HP
                 </div>
               </div>
               <div className="bg-amber-50/70 p-3 rounded-xl border border-amber-200/80">
@@ -1460,7 +1458,7 @@ export default function AcademicsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {selectedPlanDetail.courses?.map((c: any) => (
+                  {selectedPlanDetail.courses?.map((c: ApiData) => (
                     <tr key={c.id || c.courseId} className="hover:bg-slate-50/60">
                       <td className="py-2 px-3 font-mono font-bold text-slate-800">{c.courseCode}</td>
                       <td className="py-2 px-3 font-medium text-slate-800">{c.courseName}</td>

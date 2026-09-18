@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Tabs from "@/components/ui/Tabs";
-import FilterBar from "@/components/ui/FilterBar";
 import SlideOverDrawer from "@/components/ui/SlideOverDrawer";
 import Modal from "@/components/ui/Modal";
 import { useAuthStore } from "@/stores/authStore";
@@ -11,30 +10,29 @@ export default function AcademicWarningsPage() {
   const { can } = useAuthStore();
   const [activeTab, setActiveTab] = useState<"runs" | "policies">("runs");
   const [loading, setLoading] = useState(true);
-  const [policies, setPolicies] = useState<any[]>([]);
-  const [runs, setRuns] = useState<any[]>([]);
+  const [policies, setPolicies] = useState<ApiData[]>([]);
+  const [runs, setRuns] = useState<ApiData[]>([]);
 
   // Selected run & Drawer state
-  const [selectedRun, setSelectedRun] = useState<any | null>(null);
-  const [students, setStudents] = useState<any[]>([]);
-  const [groups, setGroups] = useState<any[]>([]);
+  const [selectedRun, setSelectedRun] = useState<ApiData | null>(null);
+  const [students, setStudents] = useState<ApiData[]>([]);
   const [severityFilter, setSeverityFilter] = useState<string>("all");
 
   // Selected student for explainable detail
-  const [selectedStudentDetail, setSelectedStudentDetail] = useState<any | null>(null);
+  const [selectedStudentDetail, setSelectedStudentDetail] = useState<ApiData | null>(null);
 
   // Intervention Quick Action state
   const [interventionNote, setInterventionNote] = useState("");
   const [interventionSaved, setInterventionSaved] = useState(false);
-  const [existingActions, setExistingActions] = useState<any[]>([]);
+  const [existingActions, setExistingActions] = useState<ApiData[]>([]);
   const [actionSaving, setActionSaving] = useState(false);
   const [interventionStatus, setInterventionStatus] = useState("IN_PROGRESS");
 
   // Trigger run modal state
   const [showRunModal, setShowRunModal] = useState(false);
-  const [cohorts, setCohorts] = useState<any[]>([]);
-  const [programs, setPrograms] = useState<any[]>([]);
-  const [years, setYears] = useState<any[]>([]);
+  const [cohorts, setCohorts] = useState<ApiData[]>([]);
+  const [programs, setPrograms] = useState<ApiData[]>([]);
+  const [years, setYears] = useState<ApiData[]>([]);
   const [selCohort, setSelCohort] = useState("");
   const [selProgram, setSelProgram] = useState("");
   const [selYear, setSelYear] = useState("");
@@ -89,20 +87,13 @@ export default function AcademicWarningsPage() {
     loadData();
   }, []);
 
-  const handleOpenRunReport = async (run: any) => {
+  const handleOpenRunReport = async (run: ApiData) => {
     setSelectedRun(run);
     try {
-      const [sRes, gRes] = await Promise.all([
-        fetch(`/api/v1/academic-warnings/runs/${run.id}/students`),
-        fetch(`/api/v1/academic-warnings/runs/${run.id}/groups`),
-      ]);
+      const sRes = await fetch(`/api/v1/academic-warnings/runs/${run.id}/students`);
       if (sRes.ok) {
         const sJson = await sRes.json();
         setStudents(sJson.items || sJson || []);
-      }
-      if (gRes.ok) {
-        const gJson = await gRes.json();
-        setGroups(gJson.items || gJson || []);
       }
     } catch (e) {
       console.error(e);
@@ -246,7 +237,7 @@ export default function AcademicWarningsPage() {
         const err = await res.json();
         alert(err.error?.message || "Lỗi khi tạo chính sách");
       }
-    } catch (e: any) {
+    } catch (e: ApiData) {
       alert(e.message || "Lỗi kết nối");
     } finally {
       setPolicyLoading(false);
@@ -280,7 +271,7 @@ export default function AcademicWarningsPage() {
         const err = await res.json();
         alert(err.error?.message || "Lỗi khi quét cảnh báo");
       }
-    } catch (e: any) {
+    } catch (e: ApiData) {
       alert(e.message || "Lỗi xử lý");
     } finally {
       setRunLoading(false);
@@ -350,7 +341,7 @@ export default function AcademicWarningsPage() {
           { id: "policies", label: "Chính sách Ngưỡng Cảnh báo", badge: policies.length },
         ]}
         activeTab={activeTab}
-        onChange={(id) => setActiveTab(id as any)}
+        onChange={(id) => setActiveTab(id as ApiData)}
       />
 
       {loading ? (
@@ -647,7 +638,7 @@ export default function AcademicWarningsPage() {
                   Không có lý do vi phạm chi tiết
                 </div>
               ) : (
-                selectedStudentDetail.reasons.map((r: any, idx: number) => (
+                selectedStudentDetail.reasons.map((r: ApiData, idx: number) => (
                   <div key={idx} className="p-3.5 rounded-xl border border-red-200 bg-red-50/50 space-y-1.5">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-red-900 flex items-center gap-1.5">
@@ -950,7 +941,7 @@ export default function AcademicWarningsPage() {
                 className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800"
               >
                 <option value="">Chọn học kỳ</option>
-                {termsForSelectedYear.map((t: any) => (
+                {termsForSelectedYear.map((t: ApiData) => (
                   <option key={t.id} value={t.id}>
                     {t.sTermCode || t.termCode}
                   </option>

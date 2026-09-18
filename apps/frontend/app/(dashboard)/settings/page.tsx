@@ -5,8 +5,7 @@ import { useAuthStore } from "@/stores/authStore";
 
 export default function SettingsPage() {
   const canManagePolicy = useAuthStore((state) => state.can("academic_warning.policy.manage"));
-  const [policies, setPolicies] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [policies, setPolicies] = useState<ApiData[]>([]);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -20,14 +19,13 @@ export default function SettingsPage() {
   useEffect(() => {
     async function loadPolicies() {
       try {
-        setLoading(true);
         const res = await fetch("/api/v1/academic-warnings/policies");
         if (res.ok) {
           const json = await res.json();
           const items = Array.isArray(json.items) ? json.items : Array.isArray(json) ? json : [];
           setPolicies(items);
           if (items.length > 0) {
-            const active = items.find((p: any) => p.status === "active") || items[0];
+            const active = items.find((p: ApiData) => p.status === "active") || items[0];
             setActivePolicyId(active.id);
             setPolicyName(active.name || active.policyName || "Chính sách Cảnh báo Học vụ");
             setTermGpaThreshold(active.termGpaThreshold ?? 2.0);
@@ -38,7 +36,7 @@ export default function SettingsPage() {
       } catch (err) {
         console.error("Load policies error:", err);
       } finally {
-        setLoading(false);
+        // The form remains usable with defaults if policy loading fails.
       }
     }
     loadPolicies();
@@ -78,7 +76,7 @@ export default function SettingsPage() {
         const err = await res.json();
         alert(err.error?.message || "Lỗi khi cập nhật chính sách");
       }
-    } catch (err: any) {
+    } catch (err: ApiData) {
       alert(err.message || "Lỗi kết nối máy chủ");
     } finally {
       setSaving(false);

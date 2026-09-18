@@ -13,12 +13,12 @@ export default function RbacPage() {
   const [loading, setLoading] = useState(true);
 
   // Data collections
-  const [users, setUsers] = useState<any[]>([]);
-  const [roles, setRoles] = useState<any[]>([]);
-  const [permissions, setPermissions] = useState<any[]>([]);
-  const [advisors, setAdvisors] = useState<any[]>([]);
-  const [classes, setClasses] = useState<any[]>([]);
-  const [years, setYears] = useState<any[]>([]);
+  const [users, setUsers] = useState<ApiData[]>([]);
+  const [roles, setRoles] = useState<ApiData[]>([]);
+  const [permissions, setPermissions] = useState<ApiData[]>([]);
+  const [advisors, setAdvisors] = useState<ApiData[]>([]);
+  const [classes, setClasses] = useState<ApiData[]>([]);
+  const [years, setYears] = useState<ApiData[]>([]);
 
   // Search & filter in tabs
   const [userSearch, setUserSearch] = useState("");
@@ -38,7 +38,7 @@ export default function RbacPage() {
     roleCodes: ["faculty_board"],
   });
   const [showEditUserModal, setShowEditUserModal] = useState(false);
-  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [editingUser, setEditingUser] = useState<ApiData | null>(null);
   const [editUserForm, setEditUserForm] = useState({
     fullName: "",
     email: "",
@@ -49,13 +49,13 @@ export default function RbacPage() {
 
   // Modals state: Roles & Permissions
   const [showRolePermissionsModal, setShowRolePermissionsModal] = useState(false);
-  const [editingRole, setEditingRole] = useState<any | null>(null);
+  const [editingRole, setEditingRole] = useState<ApiData | null>(null);
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
 
   // Modals state: Advisor Assignment
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignForm, setAssignForm] = useState({ userId: "", classId: "", academicYearId: "", academicTermId: "" });
-  const [revokeTarget, setRevokeTarget] = useState<any | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<ApiData | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   // Load all RBAC data
@@ -103,7 +103,8 @@ export default function RbacPage() {
   };
 
   useEffect(() => {
-    loadData();
+    const timeout = window.setTimeout(() => void loadData(), 0);
+    return () => window.clearTimeout(timeout);
   }, []);
 
   // Handle Create User
@@ -147,7 +148,7 @@ export default function RbacPage() {
 
     try {
       setActionLoading(true);
-      const payload: any = {
+      const payload: ApiData = {
         fullName: editUserForm.fullName.trim(),
         email: editUserForm.email.trim(),
         isActive: editUserForm.isActive,
@@ -181,7 +182,7 @@ export default function RbacPage() {
   };
 
   // Open Edit Role Permissions Modal
-  const handleOpenRolePermissions = async (role: any) => {
+  const handleOpenRolePermissions = async (role: ApiData) => {
     setEditingRole(role);
     setPermissionSearch("");
     setPermissionFilterStatus("all");
@@ -189,7 +190,7 @@ export default function RbacPage() {
       const res = await fetch(`/api/v1/rbac/roles/${role.id}/permissions`);
       if (res.ok) {
         const json = await res.json();
-        const codes = (json.items || []).map((p: any) => p.code || p.sPermissionCode);
+        const codes = (json.items || []).map((p: ApiData) => p.code || p.sPermissionCode);
         setSelectedPermissions(codes);
       }
     } catch {
@@ -345,7 +346,7 @@ export default function RbacPage() {
   };
 
   const groupedPermissions = useMemo(() => {
-    return permissions.reduce((acc: Record<string, any[]>, p) => {
+    return permissions.reduce((acc: Record<string, ApiData[]>, p) => {
       const res = p.resource || p.sResource || "other";
       if (!acc[res]) acc[res] = [];
       acc[res].push(p);
@@ -476,7 +477,7 @@ export default function RbacPage() {
           { id: "advisors", label: "Phân công Cố vấn học tập", badge: advisors.length },
         ]}
         activeTab={activeTab}
-        onChange={(id) => setActiveTab(id as any)}
+        onChange={(id) => setActiveTab(id as ApiData)}
       />
 
       {loading ? (
@@ -538,7 +539,7 @@ export default function RbacPage() {
                           (u.email || "").toLowerCase().includes(userSearch.toLowerCase())
                         )
                         .map((u) => {
-                          const assignedRoles = (u.roleCodes || (u.roles ? u.roles.map((r: any) => r.code) : ["faculty_board"]));
+                          const assignedRoles = (u.roleCodes || (u.roles ? u.roles.map((r: ApiData) => r.code) : ["faculty_board"]));
                           return (
                             <tr key={u.id} className="hover:bg-slate-50/70 transition-colors">
                               <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
@@ -1052,7 +1053,7 @@ export default function RbacPage() {
 
                 <select
                   value={permissionFilterStatus}
-                  onChange={(e) => setPermissionFilterStatus(e.target.value as any)}
+                  onChange={(e) => setPermissionFilterStatus(e.target.value as ApiData)}
                   className="bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none"
                 >
                   <option value="all">Tất cả quyền</option>
@@ -1103,14 +1104,13 @@ export default function RbacPage() {
                   color: "text-slate-600 bg-slate-50 border-slate-200",
                 };
 
-                const groupCodes = permList.map((p: any) => p.code || p.sPermissionCode);
+                const groupCodes = permList.map((p: ApiData) => p.code || p.sPermissionCode);
                 const selectedInGroup = groupCodes.filter((c: string) => selectedPermissions.includes(c));
                 const isAllGroupSelected = groupCodes.length > 0 && selectedInGroup.length === groupCodes.length;
-                const isPartiallySelected = selectedInGroup.length > 0 && selectedInGroup.length < groupCodes.length;
                 const isExpanded = expandedGroups[resKey] ?? true;
 
                 // Apply search and status filter
-                const filtered = permList.filter((p: any) => {
+                const filtered = permList.filter((p: ApiData) => {
                   const code = p.code || p.sPermissionCode || "";
                   const name = p.name || p.sPermissionName || "";
                   const matchesSearch =
@@ -1215,7 +1215,7 @@ export default function RbacPage() {
                           </div>
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {filtered.map((p: any) => {
+                            {filtered.map((p: ApiData) => {
                               const code = p.code || p.sPermissionCode;
                               const isChecked = selectedPermissions.includes(code);
                               const action = p.action || p.sAction || code.split(":")[1] || "manage";
@@ -1350,7 +1350,7 @@ export default function RbacPage() {
                 className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
               >
                 <option value="">Chọn học kỳ</option>
-                {termsForAssignYear.map((t: any) => (
+                {termsForAssignYear.map((t: ApiData) => (
                   <option key={t.id} value={t.id}>
                     {t.sTermCode || t.termCode}
                   </option>
