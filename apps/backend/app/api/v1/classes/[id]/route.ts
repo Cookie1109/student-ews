@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { ClassesService } from "@/lib/services/classes";
 import { apiErrorResponse, readJsonBody } from "@/lib/utils/api-error";
 import { errorResponse, jsonResponse } from "@/lib/utils/api-response";
+import { recordAudit } from "@/lib/services/audit";
 
 interface Params { params: Promise<{ id: string }> }
 
@@ -28,10 +29,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
 export const PATCH = PUT;
 
-export async function DELETE(_request: NextRequest, { params }: Params) {
+export async function DELETE(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
     await ClassesService.remove(id);
+    await recordAudit(request, { action: "class.delete", resourceType: "Class", resourceId: id });
     return new Response(null, { status: 204 });
   } catch (error) {
     return apiErrorResponse(error, "Failed to delete class");

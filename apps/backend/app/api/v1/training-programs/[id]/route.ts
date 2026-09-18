@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { TrainingProgramsService } from "@/lib/services/training-programs";
 import { jsonResponse, errorResponse } from "@/lib/utils/api-response";
 import { apiErrorResponse, readJsonBody } from "@/lib/utils/api-error";
+import { recordAudit } from "@/lib/services/audit";
 
 export async function GET(
   req: NextRequest,
@@ -40,12 +41,13 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
     await TrainingProgramsService.removeProgram(id);
+    await recordAudit(request, { action: "training_program.delete", resourceType: "TrainingProgram", resourceId: id });
     return new Response(null, { status: 204 });
   } catch (error) {
     return apiErrorResponse(error, "Failed to delete training program");

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { RbacService } from "@/lib/services/rbac";
 import { jsonResponse } from "@/lib/utils/api-response";
 import { apiErrorResponse, readJsonBody } from "@/lib/utils/api-error";
+import { recordAudit } from "@/lib/services/audit";
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -19,6 +20,15 @@ export async function PUT(req: NextRequest, { params }: Params) {
     }>(req);
 
     const updated = await RbacService.updateUser(id, body);
+    await recordAudit(req, {
+      action: "user.update",
+      resourceType: "User",
+      resourceId: id,
+      details: {
+        changedFields: Object.keys(body),
+        ...(body.roleCodes ? { roleCodes: body.roleCodes } : {}),
+      },
+    });
     return jsonResponse(updated);
   } catch (err: unknown) {
     return apiErrorResponse(err, "Failed to update user");

@@ -3,6 +3,7 @@ import { RbacService } from "@/lib/services/rbac";
 import { jsonResponse, errorResponse } from "@/lib/utils/api-response";
 import { requirePermission } from "@/lib/auth/authorize";
 import { apiErrorResponse, readJsonBody } from "@/lib/utils/api-error";
+import { recordAudit } from "@/lib/services/audit";
 
 export async function GET() {
   try {
@@ -27,6 +28,12 @@ export async function POST(req: NextRequest) {
       classId: body.classId,
       academicTermId: body.academicTermId,
       assignedById: auth.actor.userId,
+    });
+    await recordAudit(req, {
+      action: "advisor_assignment.create",
+      resourceType: "ClassAdvisorAssignment",
+      resourceId: assignment.id,
+      details: { userId: body.userId, classId: body.classId, academicTermId: body.academicTermId },
     });
     return jsonResponse(assignment, 201);
   } catch (err) {

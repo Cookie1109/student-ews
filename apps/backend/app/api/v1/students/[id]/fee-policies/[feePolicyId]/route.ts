@@ -3,6 +3,7 @@ import { FeePoliciesService } from "@/lib/services/fee-policies";
 import { jsonResponse, errorResponse } from "@/lib/utils/api-response";
 import { apiErrorResponse } from "@/lib/utils/api-error";
 import { requireStudentPermission } from "@/lib/auth/data-scope";
+import { recordAudit } from "@/lib/services/audit";
 
 export async function GET(
   req: NextRequest,
@@ -46,6 +47,7 @@ export async function DELETE(
     const auth = await requireStudentPermission(req, id, "fee_policy.delete");
     if (!auth.authorized) return auth.response;
     await FeePoliciesService.delete(id, feePolicyId);
+    await recordAudit(req, { action: "student_fee_policy.delete", resourceType: "StudentFeePolicy", resourceId: feePolicyId, details: { studentIdentifier: id } });
     return new Response(null, { status: 204 });
   } catch (err) {
     return apiErrorResponse(err, "Failed to delete fee policy");

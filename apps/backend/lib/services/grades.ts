@@ -8,7 +8,7 @@ import { ApiError } from "@/lib/utils/api-error";
 // Types — matches SWE model.go SourceYear/SourceTerm/SourceGrade
 // ============================================================================
 
-interface SourceGrade {
+export interface SourceGrade {
   StudentID: string;
   StudyProgramID: string;
   YearStudy?: string;
@@ -128,6 +128,17 @@ function validYear(s: string): boolean {
   const a = parseInt(parts[0], 10);
   const b = parseInt(parts[1], 10);
   return !isNaN(a) && !isNaN(b) && b === a + 1;
+}
+
+export function gradeImportRowKey(year: string, term: string, grade: SourceGrade) {
+  return [
+    grade.StudentID.trim(),
+    (grade.StudyProgramID || "").trim(),
+    year.trim(),
+    normalizeTerm(term),
+    grade.StudyUnitID.trim(),
+    (grade.ScheduleStudyUnitID || "").trim(),
+  ].join("|");
 }
 
 // ============================================================================
@@ -337,7 +348,7 @@ export class GradesService {
           if (!g.StudentID?.trim() || !g.CurriculumID?.trim() || !g.StudyUnitID?.trim()) {
             throw new ApiError("StudentID, CurriculumID, and StudyUnitID are required", "INVALID_REQUEST", 400);
           }
-          const key = [g.StudentID.trim(), y.NamHoc, term, g.StudyUnitID.trim(), (g.ScheduleStudyUnitID || "").trim()].join("|");
+          const key = gradeImportRowKey(y.NamHoc, term, g);
           uniqueRows.set(key, { year: y.NamHoc, term, grade: g, payload: JSON.stringify(g), row: uniqueRows.size });
         }
       }

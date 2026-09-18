@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { RbacService } from "@/lib/services/rbac";
 import { apiErrorResponse, readJsonBody } from "@/lib/utils/api-error";
 import { errorResponse, jsonResponse } from "@/lib/utils/api-response";
+import { recordAudit } from "@/lib/services/audit";
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -25,6 +26,12 @@ export async function PUT(request: NextRequest, { params }: Params) {
       return errorResponse("permissionCodes must be an array of strings", "INVALID_REQUEST", 400);
     }
     const permissions = await RbacService.replaceRolePermissions(id, body.permissionCodes);
+    await recordAudit(request, {
+      action: "role.permissions.replace",
+      resourceType: "Role",
+      resourceId: id,
+      details: { permissionCodes: body.permissionCodes },
+    });
     return jsonResponse({ items: permissions, total: permissions.length });
   } catch (error) {
     return apiErrorResponse(error, "Failed to update role permissions");

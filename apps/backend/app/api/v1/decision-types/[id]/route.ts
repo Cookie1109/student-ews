@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { DecisionsService } from "@/lib/services/decisions";
 import { apiErrorResponse, readJsonBody } from "@/lib/utils/api-error";
 import { errorResponse, jsonResponse } from "@/lib/utils/api-response";
+import { recordAudit } from "@/lib/services/audit";
 
 interface Params { params: Promise<{ id: string }> }
 
@@ -25,11 +26,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: Params) {
+export async function DELETE(request: NextRequest, { params }: Params) {
   try {
     const id = numericId((await params).id);
     if (!id) return errorResponse("Invalid decision type id", "INVALID_ID", 400);
     await DecisionsService.removeType(id);
+    await recordAudit(request, { action: "decision_type.delete", resourceType: "DecisionType", resourceId: String(id) });
     return new Response(null, { status: 204 });
   } catch (error) {
     return apiErrorResponse(error, "Failed to delete decision type");

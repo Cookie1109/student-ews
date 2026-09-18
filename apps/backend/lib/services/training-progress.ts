@@ -229,8 +229,10 @@ export function evaluateProgress(
   eval_.choiceGroupResults.sort((a, b) => a.code.localeCompare(b.code));
 
   // Outside-plan courses
+  const outsideCourseIds = new Set<string>();
   for (const r of registrations) {
-    if (!planCourseIds.has(r.courseId)) {
+    if (!planCourseIds.has(r.courseId) && !outsideCourseIds.has(r.courseId)) {
+      outsideCourseIds.add(r.courseId);
       eval_.outsidePlanCourses++;
       eval_.outsidePlanCredits += r.credits;
       eval_.courses.push({

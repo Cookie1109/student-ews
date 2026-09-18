@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { TrainingProgramsService } from "@/lib/services/training-programs";
 import { apiErrorResponse, readJsonBody } from "@/lib/utils/api-error";
 import { errorResponse, jsonResponse } from "@/lib/utils/api-response";
+import { recordAudit } from "@/lib/services/audit";
 
 interface Params { params: Promise<{ id: string }> }
 
@@ -35,10 +36,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: Params) {
+export async function DELETE(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
     await TrainingProgramsService.removeAcademicYear(id);
+    await recordAudit(request, { action: "academic_year.delete", resourceType: "AcademicYear", resourceId: id });
     return new Response(null, { status: 204 });
   } catch (error) {
     return apiErrorResponse(error, "Failed to delete academic year");

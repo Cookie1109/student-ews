@@ -3,6 +3,7 @@ import { DecisionsService } from "@/lib/services/decisions";
 import { jsonResponse, errorResponse } from "@/lib/utils/api-response";
 import { apiErrorResponse } from "@/lib/utils/api-error";
 import { requireStudentPermission } from "@/lib/auth/data-scope";
+import { recordAudit } from "@/lib/services/audit";
 
 export async function GET(
   req: NextRequest,
@@ -46,6 +47,7 @@ export async function DELETE(
     const auth = await requireStudentPermission(req, id, "decision.delete");
     if (!auth.authorized) return auth.response;
     await DecisionsService.delete(id, decisionId);
+    await recordAudit(req, { action: "student_decision.delete", resourceType: "StudentDecision", resourceId: decisionId, details: { studentIdentifier: id } });
     return new Response(null, { status: 204 });
   } catch (err) {
     return apiErrorResponse(err, "Failed to delete decision");

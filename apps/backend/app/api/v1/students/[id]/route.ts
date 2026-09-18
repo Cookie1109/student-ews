@@ -3,6 +3,7 @@ import { StudentsService } from "@/lib/services/students";
 import { jsonResponse, errorResponse } from "@/lib/utils/api-response";
 import { inaccessibleStudentTargetIndexes, requireStudentPermission } from "@/lib/auth/data-scope";
 import { apiErrorResponse, readJsonBody } from "@/lib/utils/api-error";
+import { recordAudit } from "@/lib/services/audit";
 
 export async function GET(
   req: NextRequest,
@@ -58,6 +59,7 @@ export async function DELETE(
     if (!auth.authorized) return auth.response;
     const deleted = await StudentsService.delete(id);
     if (!deleted) return errorResponse("Student not found", "NOT_FOUND", 404);
+    await recordAudit(req, { action: "student.delete", resourceType: "Student", resourceId: id });
     return new Response(null, { status: 204 });
   } catch (err) {
     return apiErrorResponse(err, "Failed to delete student");

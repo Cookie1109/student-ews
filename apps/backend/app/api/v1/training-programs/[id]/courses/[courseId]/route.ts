@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { TrainingProgramsService } from "@/lib/services/training-programs";
 import { jsonResponse, errorResponse } from "@/lib/utils/api-response";
+import { recordAudit } from "@/lib/services/audit";
 
 export async function PUT(
   req: NextRequest,
@@ -26,6 +27,7 @@ export async function DELETE(
   try {
     const { id, courseId } = await params;
     await TrainingProgramsService.deleteProgramCourse(id, courseId);
+    await recordAudit(req, { action: "training_program_course.delete", resourceType: "TrainingProgramCourse", details: { trainingProgramId: id, courseId } });
     return new Response(null, { status: 204 });
   } catch (err: any) {
     console.error("Delete program course error:", err);

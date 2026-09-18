@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { RbacService } from "@/lib/services/rbac";
 import { apiErrorResponse, readJsonBody } from "@/lib/utils/api-error";
 import { errorResponse, jsonResponse } from "@/lib/utils/api-response";
+import { recordAudit } from "@/lib/services/audit";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -21,7 +22,14 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (typeof body.roleCode !== "string" || !body.roleCode.trim()) {
       return errorResponse("roleCode is required", "INVALID_REQUEST", 400);
     }
-    return jsonResponse(await RbacService.assignUserRole(id, body.roleCode.trim()));
+    const result = await RbacService.assignUserRole(id, body.roleCode.trim());
+    await recordAudit(request, {
+      action: "user.role.assign",
+      resourceType: "User",
+      resourceId: id,
+      details: { roleCode: body.roleCode.trim() },
+    });
+    return jsonResponse(result);
   } catch (error) {
     return apiErrorResponse(error, "Failed to assign user role");
   }
