@@ -17,6 +17,8 @@ chạy, build và triển khai độc lập.
 - Cảnh báo học vụ, cấu hình chính sách và ghi nhận hành động theo dõi.
 - Quản lý điểm, quyết định, chính sách miễn giảm học phí; nhập và xuất dữ liệu.
 - Báo cáo học vụ; quản lý tài khoản, vai trò, quyền và phân công cố vấn.
+- Xuất workbook Excel cho cảnh báo, tiến độ CTĐT, rèn luyện và hỗ trợ; xuất PDF
+  báo cáo tổng hợp và hồ sơ sinh viên.
 - Đăng nhập bằng JWT, refresh token qua HttpOnly cookie và giới hạn phạm vi dữ liệu.
 
 ## Công nghệ
@@ -31,6 +33,7 @@ chạy, build và triển khai độc lập.
 | Xác thực | JWT (`jose`), `bcryptjs`, HttpOnly cookie |
 | Quản lý repository | npm workspaces |
 | Kiểm thử | Node.js test runner và `tsx` |
+| Xuất file | ExcelJS, PDFKit, Noto Sans |
 
 ## Cấu trúc dự án
 
@@ -43,7 +46,7 @@ scripts/         Lệnh chạy chung và smoke test
 ```
 
 Backend hiện vẫn dùng Next.js Route Handlers. Việc tách này chưa chuyển framework
-sang NestJS. Toàn bộ 93 route (142 phương thức API) và nghiệp vụ được giữ lại;
+sang NestJS. Toàn bộ 97 route (147 phương thức API) và nghiệp vụ được giữ lại;
 frontend không import mã backend hay Prisma. Nếu chuyển backend sang NestJS sau
 này, giữ hợp đồng `/api/v1` để frontend tiếp tục hoạt động.
 
@@ -167,15 +170,29 @@ ID, API proxy, origin và cả hai header Set-Cookie khi đăng xuất không c�
 Đặt `SMOKE_FRONTEND_URL` / `SMOKE_BACKEND_URL` nếu dùng cổng khác.
 Đặt `SMOKE_ACCESS_TOKEN` của tài khoản test có quyền `student.read` để kiểm tra
 thêm phiên đăng nhập, dashboard và kết quả API phân trang qua hai đường truy cập.
-Token không được in ra. Smoke test không thay đổi dữ liệu nghiệp vụ.
+Token không được in ra. Đặt thêm `SMOKE_STUDENT_ID` để kiểm tra endpoint rèn
+luyện và `SMOKE_EXPORTS=1` để kiểm tra chữ ký file XLSX/PDF. Kiểm tra export tạo
+bản ghi `report.export` trong audit log nhưng không thay đổi dữ liệu học vụ.
 
 Test hồi quy login/refresh dùng persistence giả lập và chạy các route handler,
 JWT, cookie, phân quyền thật; không tạo tài khoản hoặc phiên trong database.
 Trên Windows, dừng backend trước khi chạy `db:generate` nếu Prisma báo DLL đang
 bị khóa (`EPERM`).
 
-Lint frontend còn các lỗi trong mã giao diện có từ trước lần tách; không tắt các
-quy tắc lint để che lỗi. Lint backend, test và build được kiểm tra riêng.
+Lint frontend/backend và typecheck được chạy độc lập; quy tắc lint không bị tắt
+để che lỗi.
+
+## Xuất báo cáo
+
+Người dùng cần quyền `report.export`. Giao diện Báo cáo cho phép chọn dữ liệu
+cảnh báo, tiến độ CTĐT, rèn luyện hoặc nhật ký hỗ trợ để tải `.xlsx`; nút PDF tạo
+báo cáo cảnh báo tổng hợp. Trang chi tiết sinh viên có nút **Xuất PDF hồ sơ**.
+
+API dùng `GET /api/v1/reports/export` với `format=xlsx|pdf`,
+`type=warnings|progress|conduct|support|student-profile` và các bộ lọc tùy chọn
+`academicYearId`, `academicTermId`, `cohortId`, `programCode`, `classCode`,
+`severity`. `student-profile` yêu cầu `studentId` và chỉ hỗ trợ PDF. Mọi lần xuất
+được giới hạn theo data scope của tài khoản và ghi audit log.
 
 ## Tài liệu liên quan
 
@@ -183,4 +200,6 @@ quy tắc lint để che lỗi. Lint backend, test và build được kiểm tra
 - [Schema database](apps/backend/prisma/schema.prisma).
 - [Hướng dẫn migration](apps/backend/prisma/MIGRATIONS.md).
 - [Danh sách phương thức API](apps/backend/tests/fixtures/api-operations.json).
+- [Hướng dẫn sử dụng](docs/USER_GUIDE.md).
+- [Báo cáo hoàn thành giai đoạn 3](docs/PHASE_3_PROGRESS_REPORT.md).
 - [Mã Vite lưu trữ](legacy/vite/README.md).

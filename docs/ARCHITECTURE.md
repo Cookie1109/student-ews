@@ -333,7 +333,9 @@ Chỉ gọi đầu ra là xác suất khi mô hình/kiểm định hỗ trợ di
 
 Dashboard tách số sinh viên, nguyên nhân, quyết định và hành động. Một người nhiều lý do chỉ tính một lần trong tổng cảnh báo. Chỉ số theo run dùng cùng `runId`; dữ liệu mới nhất có nhãn thời điểm. Báo cáo kèm kỳ, khóa/CTĐT, chính sách/mô hình, scope và số thiếu dữ liệu.
 
-Tỷ lệ giải quyết dùng mẫu số hồ sơ thuộc kỳ/phạm vi, không lấy số ghi chú `RESOLVED` chia số lý do. Giao diện báo cáo hiện ghép dữ liệu tải từ API thành CSV phía trình duyệt và đặt tên nút “Xuất Excel (CSV)”; đây chưa phải file XLSX. Excel/PDF là yêu cầu S1 cần hoàn thiện và kiểm tra riêng; endpoint tên `export` chưa chứng minh có đúng định dạng.
+Tỷ lệ giải quyết dùng mẫu số hồ sơ thuộc kỳ/phạm vi, không lấy số ghi chú `RESOLVED` chia số lý do. `ExportService` tạo workbook XLSX bằng ExcelJS cho cảnh báo, tiến độ CTĐT, rèn luyện và nhật ký hỗ trợ; PDFKit cùng Noto Sans tạo báo cáo cảnh báo tổng hợp và hồ sơ sinh viên tiếng Việt. File được trả từ `GET /reports/export`, luôn áp dụng data scope và ghi audit `report.export`. Frontend không còn ghép CSV giả Excel.
+
+Trang hồ sơ sinh viên ghép lịch sử cảnh báo, quyết định và hành động hỗ trợ thành một timeline theo thời điểm. PDF hồ sơ lấy dữ liệu trực tiếp ở backend gồm thông tin cá nhân, GPA/tín chỉ, rèn luyện, tiến độ CTĐT, cảnh báo, quyết định và nhật ký hỗ trợ.
 
 ## 11. API và phân quyền
 
@@ -350,10 +352,11 @@ Base path `/api/v1`; [api-operations.json](../apps/backend/tests/fixtures/api-op
 | `/training-progress/plans`, `/training-progress/runs` | Kế hoạch, đăng ký |
 | `/training-progress/completion/runs`, `/training-progress/completion-runs` | Hai nhóm đường dẫn hoàn thành đang có; giữ hợp đồng khi thay đổi |
 | `/academic-warnings/policies`, `/academic-warnings/runs`, `/academic-warnings/actions` | Chính sách, cảnh báo, nhật ký và chuyển trạng thái hỗ trợ |
-| `/dashboard/summary`, `/students/{id}/dashboard`, `/reports/academic-warnings` | Dashboard, báo cáo |
+| `/dashboard/summary`, `/students/{id}/dashboard`, `/reports/academic-warnings` | Dashboard, báo cáo đọc |
+| `/reports/export` | Xuất XLSX/PDF theo scope; quyền `report.export`; ghi audit |
 | `/rbac/*` | Tài khoản, role, permission, phân công |
 
-Thành công trả payload trực tiếp qua `jsonResponse`; lỗi có `error.code`, `error.message`, có thể thêm request ID ở proxy. Không có envelope chung `{ success, data }`. Helper phân trang mặc định 20, tối đa 100, nhận `pageSize`/`page_size`; không phải mọi route dùng helper. API hoạt động, phê duyệt rèn luyện và ML chưa tồn tại; khi thêm cần cập nhật fixture/test.
+Thành công trả payload trực tiếp qua `jsonResponse`; lỗi có `error.code`, `error.message`, có thể thêm request ID ở proxy. Không có envelope chung `{ success, data }`. Helper phân trang mặc định 20, tối đa 100, nhận `pageSize`/`page_size`; không phải mọi route dùng helper. API rèn luyện và xuất báo cáo đã có; phê duyệt rèn luyện tại hệ thống và ML chưa nằm trong phiên bản này. Endpoint mới phải cập nhật fixture/test.
 
 Backend kiểm tra permission theo hành động, scope theo dữ liệu. Scope có `system`, `all_students`, `faculty`, `assigned_classes`; role `admin` xử lý đặc biệt. Role lưu động trong database, không cố định theo chức danh.
 
@@ -361,7 +364,7 @@ Backend kiểm tra permission theo hành động, scope theo dữ liệu. Scope 
 
 Access/refresh token dùng HttpOnly cookie, `SameSite=Lax`, `Secure` production, thời hạn cookie 15 phút/30 ngày. Backend kiểm tra Origin ghi qua `ALLOWED_ORIGINS`, giới hạn thử đăng nhập, request ID. Chỉ backend giữ `JWT_SECRET`, `DATABASE_URL`.
 
-Dữ liệu nghiên cứu dùng định danh thay thế, giảm thông tin nhận diện, giới hạn truy cập. Không đưa ghi chú tư vấn/điểm/hồ sơ vào log công khai hoặc tập chia sẻ. Có `AuditLog` chưa chứng minh mọi thao tác nhạy cảm được ghi; kiểm chứng đường ghi khi bổ sung chức năng.
+Dữ liệu nghiên cứu dùng định danh thay thế, giảm thông tin nhận diện, giới hạn truy cập. Không đưa ghi chú tư vấn/điểm/hồ sơ vào log công khai hoặc tập chia sẻ. `AuditLog` được ghi cho xuất báo cáo, tạo/cập nhật hồ sơ hỗ trợ, thay đổi role/quyền/phân công cố vấn và các route xóa dữ liệu. Audit lưu người thao tác, resource, request ID và chi tiết không chứa mật khẩu.
 
 ## 12. Vận hành và kiểm chứng
 
@@ -371,7 +374,7 @@ Theo [README](../README.md), cần Node.js từ 20.9, npm, PostgreSQL. Hai ứng
 
 Đợt tính chạy qua API/service; `running/completed/failed` không đồng nghĩa có worker nền. Khi dữ liệu lớn, đề xuất job xử lý dài, API tạo run/đọc trạng thái, retry và idempotency trước khi đặt lịch tự động.
 
-Lệnh root: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`; `npm run test:smoke` cần hai server và database. Test hiện gồm hợp đồng API, auth/cookie/Origin, logic quyền, nhập điểm, đăng ký, hoàn thành, cảnh báo. Test SWE OpenAPI ngoài có thể skip khi thiếu file.
+Lệnh root: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`; `npm run test:smoke` cần hai server và database. Test hiện gồm hợp đồng API, auth/cookie/Origin, logic quyền, nhập điểm, đăng ký, hoàn thành, cảnh báo, rèn luyện, state machine hỗ trợ và chữ ký file XLSX/PDF. Test SWE OpenAPI ngoài có thể skip khi thiếu file.
 
 | Nhóm | Trường hợp cần kiểm chứng bổ sung |
 | --- | --- |

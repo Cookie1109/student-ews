@@ -15,7 +15,7 @@
 | **Kiến trúc** | npm monorepo, 2 Next.js app (frontend :3000, backend :3001), PostgreSQL/Prisma |
 | **Schema** | 863 dòng Prisma, đầy đủ model học vụ, CTĐT, tiến độ, cảnh báo, hỗ trợ, RBAC |
 | **Auth & RBAC** | JWT + HttpOnly cookie, refresh token, scope (`system`/`all_students`/`faculty`/`assigned_classes`), role/permission động, `ClassAdvisorAssignment`, rate limit login |
-| **API** | 93 route / 142 phương thức tại `/api/v1` bao phủ hồ sơ, điểm, CTĐT, tiến độ, cảnh báo, dashboard, báo cáo, RBAC |
+| **API** | 97 route / 147 phương thức tại `/api/v1` bao phủ hồ sơ, điểm, CTĐT, tiến độ, cảnh báo, dashboard, báo cáo, RBAC |
 | **Nhập dữ liệu** | Script import (`import-apidog-data.cjs`), `GradeImportBatch`, `UnscopedGradeRecord`, truy vết `sourcePayload`/`sourceMd5` |
 | **Tiến độ CTĐT** | `evaluateProgress()` — đối chiếu đăng ký; `evaluateCompletionPlan()` — đánh giá hoàn thành; kế hoạch phiên bản, snapshot, hash |
 | **Cảnh báo theo run** | 5 mã nguyên nhân, chính sách GPA, run/phiên bản, Xanh/Vàng/Đỏ |
@@ -110,46 +110,46 @@
 #### 3.1 Xuất Excel/PDF
 
 - [x] **Mức tạm thời hiện có**: trang báo cáo tải toàn bộ danh sách và tạo CSV phía trình duyệt; chưa phải workbook Excel
-- [ ] **Excel**: dùng thư viện (ExcelJS hoặc SheetJS) tạo file .xlsx
+- [x] **Excel**: dùng thư viện (ExcelJS hoặc SheetJS) tạo file .xlsx
   - Danh sách sinh viên cảnh báo theo kỳ/khóa/CTĐT
   - Bảng tổng hợp tiến độ CTĐT
   - Báo cáo rèn luyện
   - Nhật ký hỗ trợ
-- [ ] **PDF**: dùng thư viện (pdfkit hoặc puppeteer) tạo báo cáo
+- [x] **PDF**: dùng thư viện (pdfkit hoặc puppeteer) tạo báo cáo
   - Hồ sơ chi tiết sinh viên (học tập + rèn luyện + cảnh báo)
   - Báo cáo tổng hợp cho ban chủ nhiệm khoa
-- [ ] **API endpoint**: GET `/reports/export` với query `format=xlsx|pdf`, `type=warnings|progress|conduct`
-- [ ] **Frontend**: nút xuất trên các trang báo cáo, loading state khi tạo file
+- [x] **API endpoint**: GET `/reports/export` với query `format=xlsx|pdf`, `type=warnings|progress|conduct`
+- [x] **Frontend**: nút xuất trên các trang báo cáo, loading state khi tạo file
 
 #### 3.2 Hoàn thiện hồ sơ sinh viên
 
-- [ ] **Trang chi tiết đầy đủ**: hiện đã có học tập, điểm rèn luyện tổng hợp, quyết định, cảnh báo và nhật ký hỗ trợ; cần hoàn thiện liên kết dữ liệu giữa các phần
-- [ ] **Timeline lịch sử hợp nhất**: hiện có danh sách lịch sử cảnh báo và nhật ký hỗ trợ riêng; cần ghép cảnh báo, quyết định và hành động hỗ trợ theo kỳ/thời điểm
-- [ ] **In hồ sơ**: xuất PDF hồ sơ sinh viên đầy đủ
+- [x] **Trang chi tiết đầy đủ**: hiện đã có học tập, điểm rèn luyện tổng hợp, quyết định, cảnh báo và nhật ký hỗ trợ; cần hoàn thiện liên kết dữ liệu giữa các phần
+- [x] **Timeline lịch sử hợp nhất**: hiện có danh sách lịch sử cảnh báo và nhật ký hỗ trợ riêng; cần ghép cảnh báo, quyết định và hành động hỗ trợ theo kỳ/thời điểm
+- [x] **In hồ sơ**: xuất PDF hồ sơ sinh viên đầy đủ
 
 #### 3.3 Kiểm thử bổ sung
 
-- [ ] **Edge case nhập dữ liệu**: nhập lặp, trùng mã, thiếu kỳ, sai số, hai CTĐT
-- [ ] **Edge case điểm/CTĐT**: học lại, chờ điểm, không tính GPA, tự chọn thay thế, tín chỉ ngoài tổng
-- [ ] **Edge case tiến độ**: đăng ký nhưng chưa đạt, chưa đến hạn, pending, forecast ≠ standard
-- [ ] **Edge case cảnh báo**: biên ngưỡng GPA, nhiều lý do, thiếu GPA ≠ an toàn
-- [ ] **Rèn luyện**: trạng thái tạm/công nhận và kỳ hè
-- [ ] **Hỗ trợ/quyền**: ngoài lớp/khoa, đọc/ghi/xuất, chuyển trạng thái
-- [ ] **Báo cáo**: cùng run/scope cùng kết quả, đếm SV (không đếm lý do)
+- [x] **Edge case nhập dữ liệu**: nhập lặp, trùng mã, thiếu kỳ, sai số, hai CTĐT
+- [x] **Edge case điểm/CTĐT**: học lại, chờ điểm, không tính GPA, tự chọn thay thế, tín chỉ ngoài tổng
+- [x] **Edge case tiến độ**: đăng ký nhưng chưa đạt, chưa đến hạn, pending, forecast ≠ standard
+- [x] **Edge case cảnh báo**: biên ngưỡng GPA, nhiều lý do, thiếu GPA ≠ an toàn
+- [x] **Rèn luyện**: trạng thái tạm/công nhận và kỳ hè
+- [x] **Hỗ trợ/quyền**: ngoài lớp/khoa, đọc/ghi/xuất, chuyển trạng thái
+- [x] **Báo cáo**: cùng run/scope cùng kết quả, đếm SV (không đếm lý do)
 
 #### 3.4 Chuẩn hóa kỹ thuật
 
-- [ ] **Sửa lint frontend**: xử lý lỗi lint còn tồn đọng
-- [ ] **Chuẩn hóa API response**: thống nhất envelope nếu cần, error code, pagination
-- [ ] **Audit log**: kiểm tra mọi thao tác nhạy cảm (ghi hỗ trợ, đổi quyền, xóa dữ liệu) được ghi log
-- [ ] **Smoke test mở rộng**: bổ sung test cho rèn luyện, dự báo tốt nghiệp và xuất file
+- [x] **Sửa lint frontend**: xử lý lỗi lint còn tồn đọng
+- [x] **Chuẩn hóa API response**: thống nhất envelope nếu cần, error code, pagination
+- [x] **Audit log**: kiểm tra mọi thao tác nhạy cảm (ghi hỗ trợ, đổi quyền, xóa dữ liệu) được ghi log
+- [x] **Smoke test mở rộng**: bổ sung test cho rèn luyện, dự báo tốt nghiệp và xuất file
 
 #### 3.5 Tài liệu
 
-- [ ] **Cập nhật README**: hướng dẫn mới (seed, export, rèn luyện, dự báo tốt nghiệp)
-- [ ] **Tài liệu API**: cập nhật `api-operations.json` với endpoint mới
-- [ ] **Hướng dẫn sử dụng**: tài liệu cho người dùng cuối (cán bộ quản lý, CVHT)
-- [ ] **Cập nhật ARCHITECTURE.md**: phản ánh thay đổi schema, API, nghiệp vụ mới
+- [x] **Cập nhật README**: hướng dẫn mới (seed, export, rèn luyện, dự báo tốt nghiệp)
+- [x] **Tài liệu API**: cập nhật `api-operations.json` với endpoint mới
+- [x] **Hướng dẫn sử dụng**: tài liệu cho người dùng cuối (cán bộ quản lý, CVHT)
+- [x] **Cập nhật ARCHITECTURE.md**: phản ánh thay đổi schema, API, nghiệp vụ mới
 
 **Sản phẩm giao nộp:** Nộp báo cáo đồ án (16–22/11/2026)
 
@@ -235,16 +235,16 @@ flowchart TD
 
 ## 6. Tiêu chí hoàn thành đồ án
 
-- [ ] Hồ sơ sinh viên đầy đủ (học tập + rèn luyện + cảnh báo + hỗ trợ)
+- [x] Hồ sơ sinh viên đầy đủ (học tập + rèn luyện + cảnh báo + hỗ trợ)
 - [ ] Dữ liệu điểm/đăng ký/quyết định nhập và truy xuất được
 - [ ] Kế hoạch và tiến độ CTĐT đánh giá chính xác
 - [ ] Cảnh báo theo quy tắc với đầy đủ nguyên nhân, snapshot, truy vết nguồn
 - [ ] Nhật ký hỗ trợ có state machine và phân công
 - [ ] Phân quyền đúng theo vai trò và phạm vi dữ liệu
 - [x] Dashboard tổng hợp đa nguồn với bộ lọc
-- [ ] Báo cáo xuất Excel/PDF
-- [ ] Test bao phủ edge case chính
-- [ ] Tài liệu cập nhật (README, ARCHITECTURE, hướng dẫn sử dụng)
+- [x] Báo cáo xuất Excel/PDF
+- [x] Test bao phủ edge case chính
+- [x] Tài liệu cập nhật (README, ARCHITECTURE, hướng dẫn sử dụng)
 
 ---
 
