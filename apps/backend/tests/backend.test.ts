@@ -40,8 +40,6 @@ test("API permission policy follows the Phase 2 contract", () => {
   assert.equal(requiredPermission("/api/v1/training-progress/completion-runs/preview", "POST"), "progress.calculate");
   assert.equal(requiredPermission("/api/v1/academic-warnings/actions", "POST"), "academic_warning.action.create");
   assert.equal(requiredPermission(`/api/v1/academic-warnings/actions/${IDS.plan}`, "PATCH"), "academic_warning.action.update");
-  assert.equal(requiredPermission("/api/v1/activities", "GET"), "activity.read");
-  assert.equal(requiredPermission(`/api/v1/activities/${IDS.plan}`, "PUT"), "activity.manage");
 });
 
 function apiOperations(): Set<string> {
@@ -78,7 +76,7 @@ function apiOperations(): Set<string> {
   return actual;
 }
 
-test("backend preserves the complete pre-split API operation inventory", () => {
+test("backend matches the supported API operation inventory", () => {
   const expected = JSON.parse(fs.readFileSync(
     path.join(process.cwd(), "tests", "fixtures", "api-operations.json"), "utf8",
   )) as string[];

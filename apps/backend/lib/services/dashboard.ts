@@ -246,20 +246,6 @@ export class DashboardService {
       count: conductValues.filter((score) => score >= group.min && score < group.max).length,
     }));
 
-    const periodActivities = selectedTerm
-      ? await prisma.activity.findMany({
-          where: { OR: [{ academicTermId: selectedTerm.id }, { conductTermId: selectedTerm.id }] },
-          select: { id: true },
-        })
-      : [];
-    const activityParticipations = periodActivities.length && scopedStudentIds.length
-      ? await prisma.activityParticipation.findMany({
-          where: { activityId: { in: periodActivities.map((activity) => activity.id) }, studentId: { in: scopedStudentIds } },
-          select: { studentId: true, status: true },
-        })
-      : [];
-    const activityStudentIds = new Set(activityParticipations.map((row) => row.studentId));
-
     const gpaHistoryRows: Array<{
       student_id: string;
       academic_term_id: string;
@@ -429,6 +415,7 @@ export class DashboardService {
 
     const scheduleAll = progressPoint("all", "Toàn Khoa", latestWarnings, "scheduleStatus");
     const registrationAll = progressPoint("all", "Toàn Khoa", latestWarnings, "registrationStatus");
+    const graduationForecastTotal = scheduleAll.pass + scheduleAll.fail + scheduleAll.pending;
     const currentYear = selectedYear || years.find((year) => year.isCurrent) || null;
     const terms = currentYear
       ? await prisma.academicTerm.findMany({ where: { academicYearId: currentYear.id, deletedAt: null }, orderBy: { sTermOrder: "asc" } })
@@ -459,12 +446,9 @@ export class DashboardService {
         completionRate: percentage(scheduleAll.pass, scheduleAll.total),
         registrationRate: percentage(registrationAll.pass, registrationAll.total),
         warningStudents: availableMetric(warningStudents, warningStudents, scopedStudents.length),
-        graduationForecastRate: percentage(scheduleAll.pass, scheduleAll.total),
+        graduationForecastRate: percentage(scheduleAll.pass, graduationForecastTotal),
         averageConductScore: conductValues.length
           ? availableMetric(conductValues.reduce((sum, score) => sum + score, 0) / conductValues.length, conductValues.length, scopedStudents.length)
-          : unavailableMetric(),
-        activityParticipationRate: periodActivities.length
-          ? percentage(activityStudentIds.size, scopedStudents.length)
           : unavailableMetric(),
       },
       gradeDistribution,
@@ -476,17 +460,11 @@ export class DashboardService {
         return { classId: item.classId, className: item.className, median: median(values), count: values.length };
       }),
       conductDistribution: conductGroups,
-      activities: {
-        total: periodActivities.length,
-        participations: activityParticipations.length,
-        participatingStudents: activityStudentIds.size,
-        completed: activityParticipations.filter((row) => row.status === "completed").length,
-      },
       gpaByClass,
       registrationProgress: [registrationAll, ...registrationByCohort],
       programRegistrationProgress: [registrationAll, ...registrationByProgram],
       graduationForecast: {
-        total: scheduleAll.total,
+        total: graduationForecastTotal,
         onTime: scheduleAll.pass,
         conditional: scheduleAll.pending,
         incomplete: scheduleAll.fail,
@@ -544,11 +522,13 @@ export class DashboardService {
           missingStudents: Math.max(0, scopedStudents.length - conductRows.length),
           recognizedField: "lastScore",
         },
-        activities: {
+        graduationForecast: {
           academicTermId: selectedTerm?.id || null,
-          activities: periodActivities.length,
-          participatingStudents: activityStudentIds.size,
-          missingStudents: Math.max(0, scopedStudents.length - activityStudentIds.size),
+          assessedStudents: graduationForecastTotal,
+          onTime: scheduleAll.pass,
+          behindSchedule: scheduleAll.fail,
+          pending: scheduleAll.pending,
+          cannotDetermine: scheduleAll.error,
         },
       },
       filterOptions: {
@@ -590,7 +570,6 @@ export class DashboardService {
         conductApproved: conductValues.length,
         conductPending: conductRows.filter((row) => row.statusId === "0").length,
         conductMissing: Math.max(0, scopedStudents.length - conductRows.length),
-        activityMissing: Math.max(0, scopedStudents.length - activityStudentIds.size),
       },
       topClasses: classes.map((item) => {
         const total = scopedStudents.filter((student) => student.sClassStudentId === item.classId).length;

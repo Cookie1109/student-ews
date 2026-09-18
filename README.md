@@ -158,7 +158,7 @@ kiểm tra quyền và giới hạn phạm vi dữ liệu trên các request API
 ## Kiểm chứng việc tách
 
 `tests/fixtures/api-operations.json` của backend ghi lại danh sách phương thức và
-đường dẫn từ Git HEAD trước khi di chuyển. Test kiểm tra không mất/thêm endpoint.
+đường dẫn API hiện được hỗ trợ. Test kiểm tra mã nguồn không mất/thêm endpoint ngoài danh sách.
 Test đối chiếu đặc tả SWE bên ngoài sẽ skip nếu file không có; đặt
 `SWE_OPENAPI_PATH` để kiểm tra với đặc tả đó.
 

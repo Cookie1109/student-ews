@@ -46,10 +46,6 @@ export function requiredPermission(pathname: string, method: string): string | n
     return "student.read";
   }
 
-  if (pathname.startsWith("/api/v1/activities")) {
-    return method === "GET" ? "activity.read" : "activity.manage";
-  }
-
   if (pathname.startsWith("/api/v1/grades/import")) return "grade.import";
   if (pathname.startsWith("/api/v1/decisions/import")) return "decision.import";
   if (pathname.startsWith("/api/v1/decision-types")) {
@@ -111,7 +107,6 @@ export function hasInvalidUuidSegment(pathname: string): boolean {
     /^\/api\/v1\/training-progress\/completion-runs\/([^/]+)/,
     /^\/api\/v1\/academic-warnings\/runs\/([^/]+)/,
     /^\/api\/v1\/academic-warnings\/actions\/([^/]+)/,
-    /^\/api\/v1\/activities\/([^/]+)/,
     /^\/api\/v1\/rbac\/(?:users|roles|advisors|advisor-assignments)\/([^/]+)/,
   ];
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

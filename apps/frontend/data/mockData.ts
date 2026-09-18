@@ -11,7 +11,6 @@ export interface Student {
   advisor: string;
   currentGPA: number;
   trainingScore: number;
-  activityScore: number;
   riskScore: number;
   warningLevel: WarningLevel;
   academicStatus: "normal" | "warning1" | "warning2" | "suspended";
@@ -38,7 +37,7 @@ export interface InterventionLog {
 
 export interface UploadHistory {
   id: string;
-  type: "academic" | "training" | "activity";
+  type: "academic" | "training";
   uploadedBy: string;
   uploadedAt: string;
   semester: string;
@@ -82,7 +81,6 @@ export const students: Student[] = [
     advisor: "ThS. Nguyễn Thị Hoa",
     currentGPA: 1.45,
     trainingScore: 38,
-    activityScore: 20,
     riskScore: 88,
     warningLevel: "red",
     academicStatus: "warning2",
@@ -124,7 +122,6 @@ export const students: Student[] = [
     advisor: "TS. Lê Minh Tuấn",
     currentGPA: 1.82,
     trainingScore: 42,
-    activityScore: 35,
     riskScore: 74,
     warningLevel: "red",
     academicStatus: "warning1",
@@ -161,7 +158,6 @@ export const students: Student[] = [
     advisor: "ThS. Nguyễn Thị Hoa",
     currentGPA: 1.95,
     trainingScore: 50,
-    activityScore: 40,
     riskScore: 68,
     warningLevel: "red",
     academicStatus: "warning1",
@@ -201,7 +197,6 @@ export const students: Student[] = [
     advisor: "TS. Lê Minh Tuấn",
     currentGPA: 2.05,
     trainingScore: 55,
-    activityScore: 45,
     riskScore: 58,
     warningLevel: "yellow",
     academicStatus: "normal",
@@ -237,7 +232,6 @@ export const students: Student[] = [
     advisor: "ThS. Nguyễn Thị Hoa",
     currentGPA: 2.25,
     trainingScore: 60,
-    activityScore: 50,
     riskScore: 48,
     warningLevel: "yellow",
     academicStatus: "normal",
@@ -277,7 +271,6 @@ export const students: Student[] = [
     advisor: "TS. Lê Minh Tuấn",
     currentGPA: 2.42,
     trainingScore: 62,
-    activityScore: 55,
     riskScore: 40,
     warningLevel: "yellow",
     academicStatus: "normal",
@@ -316,7 +309,6 @@ export const students: Student[] = [
     advisor: "ThS. Nguyễn Thị Hoa",
     currentGPA: 3.15,
     trainingScore: 82,
-    activityScore: 70,
     riskScore: 15,
     warningLevel: "green",
     academicStatus: "normal",
@@ -355,7 +347,6 @@ export const students: Student[] = [
     advisor: "ThS. Nguyễn Thị Hoa",
     currentGPA: 3.52,
     trainingScore: 88,
-    activityScore: 80,
     riskScore: 8,
     warningLevel: "green",
     academicStatus: "normal",
@@ -390,7 +381,6 @@ export const students: Student[] = [
     advisor: "TS. Lê Minh Tuấn",
     currentGPA: 1.60,
     trainingScore: 35,
-    activityScore: 25,
     riskScore: 85,
     warningLevel: "red",
     academicStatus: "warning2",
@@ -429,7 +419,6 @@ export const students: Student[] = [
     advisor: "TS. Lê Minh Tuấn",
     currentGPA: 2.80,
     trainingScore: 74,
-    activityScore: 60,
     riskScore: 25,
     warningLevel: "green",
     academicStatus: "normal",
@@ -497,19 +486,6 @@ export const uploadHistory: UploadHistory[] = [
     errorRecords: 0,
     errors: []
   },
-  {
-    id: "u3",
-    type: "activity",
-    uploadedBy: "Phòng CTSV",
-    uploadedAt: "2024-12-10 10:05",
-    semester: "HK1 2024-25",
-    totalRecords: 500,
-    successRecords: 498,
-    errorRecords: 2,
-    errors: [
-      { line: 87, message: "Giá trị cột 'Điểm hoạt động' không phải số" },
-    ]
-  },
 ];
 
 export const warningConfig = {
@@ -517,7 +493,6 @@ export const warningConfig = {
   yellowGPA: 2.4,
   redTraining: 45,
   yellowTraining: 60,
-  weights: { academic: 60, training: 25, activity: 15 },
 };
 
 export const topWarningClasses = [

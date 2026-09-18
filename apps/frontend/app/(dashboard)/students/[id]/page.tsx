@@ -12,6 +12,35 @@ import { useAuthStore } from "@/stores/authStore";
 
 type ActiveTab = "overview" | "conduct" | "grades" | "decisions" | "fee_policies" | "registrations" | "training_plan" | "warnings";
 
+type ConductClassification = "Xuất sắc" | "Tốt" | "Khá" | "Trung bình" | "Yếu" | "Kém";
+
+type ConductRecord = {
+  id: string;
+  academicYear: string | null;
+  termCode: string | null;
+  termName: string | null;
+  scores: {
+    self: number | null;
+    class: number | null;
+    department: number | null;
+    recognized: number | null;
+  };
+  approval: {
+    code: "approved" | "pending" | "unknown";
+    label: string;
+  };
+  classification: ConductClassification | null;
+  sourceUpdatedAt: string | null;
+  sourceUpdatedBy: string | null;
+};
+
+type ConductResponse = {
+  items: ConductRecord[];
+  total: number;
+  approved: number;
+  pending: number;
+};
+
 const formatDate = (value?: string | Date | null) => {
   if (!value) return "Chưa cập nhật";
   const date = new Date(value);
@@ -24,6 +53,29 @@ const scheduleLabel = (status?: string | null) => {
   if (status === "pending_result") return "Chờ kết quả";
   if (status === "no_due_plan") return "Chưa đến hạn đánh giá";
   return "Chưa có kỳ đánh giá";
+};
+
+const formatScore = (value?: number | null) => {
+  if (value == null) return "Chưa có";
+  return Number(value).toLocaleString("vi-VN", { maximumFractionDigits: 1 });
+};
+
+const conductPeriodLabel = (record?: ConductRecord | null) => {
+  if (!record) return "Chưa có học kỳ được công nhận";
+  return [record.termCode, record.academicYear].filter(Boolean).join(" ") || "Chưa xác định học kỳ";
+};
+
+const conductClassificationStyle = (classification?: ConductClassification | null) => {
+  if (classification === "Xuất sắc" || classification === "Tốt") return "bg-emerald-100 text-emerald-700";
+  if (classification === "Khá") return "bg-lime-100 text-lime-800";
+  if (classification === "Trung bình") return "bg-amber-100 text-amber-800";
+  return "bg-red-100 text-red-700";
+};
+
+const conductApprovalStyle = (code: ConductRecord["approval"]["code"]) => {
+  if (code === "approved") return "bg-emerald-100 text-emerald-700";
+  if (code === "pending") return "bg-amber-100 text-amber-800";
+  return "bg-slate-100 text-slate-600";
 };
 
 export default function StudentDetailPage() {
@@ -42,7 +94,7 @@ export default function StudentDetailPage() {
   const [registrationsData, setRegistrationsData] = useState<any[]>([]);
   const [trainingPlanData, setTrainingPlanData] = useState<any[]>([]);
   const [dashboardData, setDashboardData] = useState<any>(null);
-  const [conductData, setConductData] = useState<any>(null);
+  const [conductData, setConductData] = useState<ConductResponse | null>(null);
   const [loadIssues, setLoadIssues] = useState<string[]>([]);
 
   // Decision & Fee Policy interactive states
@@ -165,9 +217,17 @@ export default function StudentDetailPage() {
   const sProgram = student?.program?.code || student?.studyProgramId || dashboardData?.student?.programCode || "Chưa xác định";
   const cumulative = summariesData?.cumulative || student?.cumulative || dashboardData?.cumulative;
   const latestTerm = (summariesData?.terms || []).at(-1);
-  const latestConduct = (conductData?.items || [])
-    .filter((record: any) => record.scores?.recognized != null)
+  const conductItems = conductData?.items || [];
+  const latestConduct = conductItems
+    .filter((record) => record.scores.recognized != null)
     .at(-1);
+  const conductTrend = conductItems
+    .filter((record) => record.scores.recognized != null)
+    .map((record) => ({
+      semester: conductPeriodLabel(record),
+      score: record.scores.recognized,
+      classification: record.classification,
+    }));
   const progressStatus = dashboardData?.completion?.available
     ? scheduleLabel(dashboardData.completion.scheduleStatus)
     : "Chưa có kỳ đánh giá";
@@ -237,7 +297,7 @@ export default function StudentDetailPage() {
         </div>
 
         {/* Mini stats */}
-        <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+        <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-4 md:w-auto">
           <div className="bg-[var(--color-surface2)]/70 px-4 py-2.5 rounded-xl border border-[var(--color-border)] text-center min-w-[90px]">
             <div className="text-[10px] uppercase font-bold text-slate-400">GPA Tích lũy (4)</div>
             <div className="text-xl font-black text-slate-800 font-mono">
@@ -258,6 +318,23 @@ export default function StudentDetailPage() {
               {cumulative?.cumulativeCredits ?? "—"}
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("conduct")}
+            className="min-w-[90px] cursor-pointer rounded-xl border border-lime-200 bg-[var(--color-primary-light)] px-4 py-2.5 text-center transition-colors hover:border-[var(--color-primary)] hover:bg-lime-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)]"
+            aria-label={latestConduct
+              ? `Xem điểm rèn luyện, ${formatScore(latestConduct.scores.recognized)} điểm`
+              : "Xem thông tin điểm rèn luyện, chưa có điểm được công nhận"}
+          >
+            <div className="text-[10px] font-bold uppercase text-lime-700">ĐRL gần nhất</div>
+            <div className="font-mono text-xl font-black text-lime-800">
+              {latestConduct?.scores.recognized ?? "—"}
+            </div>
+            <div className="truncate text-[10px] font-semibold text-lime-700">
+              {latestConduct?.classification || "Chưa công nhận"}
+            </div>
+          </button>
         </div>
       </div>
 
@@ -365,6 +442,18 @@ export default function StudentDetailPage() {
                   <span className="text-slate-500">Tiến độ đào tạo:</span>
                   <span className="font-semibold text-slate-800 text-right">{progressStatus}</span>
                 </div>
+                <div className="flex justify-between gap-4 py-2 border-b border-slate-100">
+                  <span className="text-slate-500">Rèn luyện gần nhất:</span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("conduct")}
+                    className="cursor-pointer text-right font-semibold text-slate-800 hover:text-[var(--color-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)]"
+                  >
+                    {latestConduct
+                      ? `${formatScore(latestConduct.scores.recognized)}/100 - ${latestConduct.classification || "Chưa phân loại"}`
+                      : "Chưa có điểm công nhận"}
+                  </button>
+                </div>
                 <div className="flex justify-between py-2">
                   <span className="text-slate-500">Số quyết định xử lý:</span>
                   <span className="font-semibold text-slate-800">{decisionsData.length} quyết định</span>
@@ -450,7 +539,7 @@ export default function StudentDetailPage() {
                   <div className="flex justify-between gap-4 py-2.5 border-b border-slate-100">
                     <dt className="text-slate-500">Điểm rèn luyện gần nhất</dt>
                     <dd className="font-mono font-bold text-slate-900">
-                      {latestConduct?.scores?.recognized ?? latestTerm?.conductScore ?? "—"}
+                      {latestConduct?.scores.recognized ?? "—"}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-4 py-2.5">
@@ -466,34 +555,130 @@ export default function StudentDetailPage() {
 
       {activeTab === "conduct" && (
         <section className="space-y-5">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Điểm công nhận gần nhất</p>
-              <p className="mt-2 font-mono text-3xl font-black text-emerald-800">{latestConduct?.scores?.recognized ?? "—"}</p>
-              <p className="mt-1 text-xs text-emerald-700">{latestConduct?.classification || "Chưa phân loại"}</p>
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
+            <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-xs sm:p-6">
+              <div className="mb-4">
+                <h3 className="font-bold text-slate-900">Diễn biến điểm rèn luyện</h3>
+                <p className="mt-1 text-xs text-slate-500">Chỉ gồm điểm đã được công nhận theo từng học kỳ</p>
+              </div>
+
+              <div className="h-64 w-full">
+                {conductTrend.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={conductTrend} margin={{ top: 12, right: 18, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                      <XAxis dataKey="semester" tick={{ fontSize: 11, fill: "#64748B" }} tickLine={false} axisLine={false} />
+                      <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={{ fontSize: 11, fill: "#64748B" }} tickLine={false} axisLine={false} />
+                      <Tooltip
+                        formatter={(value) => [`${value}/100`, "Điểm công nhận"]}
+                        contentStyle={{
+                          backgroundColor: "#FFFFFF",
+                          borderRadius: "10px",
+                          border: "1px solid #E2E8F0",
+                          fontSize: "12px",
+                        }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="score"
+                        name="Điểm công nhận"
+                        stroke="#65A30D"
+                        strokeWidth={2.5}
+                        dot={{ r: 4, fill: "#FFFFFF", strokeWidth: 2 }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex h-full items-center justify-center rounded-xl bg-slate-50 px-6 text-center text-xs text-slate-500">
+                    Chưa có điểm rèn luyện được công nhận để hiển thị biểu đồ.
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-5">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Đã công nhận</p>
-              <p className="mt-2 font-mono text-3xl font-black text-slate-900">{conductData?.approved ?? 0}</p>
-              <p className="mt-1 text-xs text-slate-500">bản ghi theo học kỳ</p>
-            </div>
-            <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700">Đang chờ</p>
-              <p className="mt-2 font-mono text-3xl font-black text-amber-800">{conductData?.pending ?? 0}</p>
-              <p className="mt-1 text-xs text-amber-700">chưa có điểm chính thức</p>
+
+            <div className="rounded-2xl border border-lime-200 bg-[var(--color-primary-light)] p-5 sm:p-6">
+              <p className="text-xs font-semibold text-lime-800">Kết quả được công nhận gần nhất</p>
+              <div className="mt-3 flex items-end gap-2">
+                <span className="font-mono text-4xl font-black leading-none text-lime-900">
+                  {latestConduct?.scores.recognized ?? "—"}
+                </span>
+                {latestConduct && <span className="pb-0.5 text-sm font-semibold text-lime-700">/ 100</span>}
+              </div>
+              <p className="mt-2 text-xs font-medium text-lime-800">{conductPeriodLabel(latestConduct)}</p>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                {latestConduct?.classification && (
+                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${conductClassificationStyle(latestConduct.classification)}`}>
+                    {latestConduct.classification}
+                  </span>
+                )}
+                <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${conductApprovalStyle(latestConduct?.approval.code || "unknown")}`}>
+                  {latestConduct?.approval.label || "Chưa có dữ liệu"}
+                </span>
+              </div>
+
+              <dl className="mt-5 grid grid-cols-2 gap-3 border-t border-lime-200 pt-4 text-xs">
+                <div>
+                  <dt className="text-lime-700">Đã công nhận</dt>
+                  <dd className="mt-1 font-mono text-xl font-black text-lime-900">{conductData?.approved ?? 0}</dd>
+                </div>
+                <div>
+                  <dt className="text-lime-700">Đang chờ</dt>
+                  <dd className="mt-1 font-mono text-xl font-black text-lime-900">{conductData?.pending ?? 0}</dd>
+                </div>
+              </dl>
             </div>
           </div>
+
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
             <div className="border-b border-slate-200 px-5 py-4">
               <h3 className="font-bold text-slate-900">Lịch sử điểm rèn luyện</h3>
-              <p className="mt-0.5 text-xs text-slate-500">lastScore chỉ được dùng khi nguồn dữ liệu có trạng thái đã công nhận.</p>
+              <p className="mt-0.5 text-xs text-slate-500">Điểm chính thức chỉ hiển thị khi kết quả của học kỳ đã được công nhận.</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead><tr className="bg-slate-50 text-[10px] font-semibold uppercase text-slate-500"><th className="px-4 py-3">Học kỳ</th><th className="px-4 py-3">Tự đánh giá</th><th className="px-4 py-3">Lớp</th><th className="px-4 py-3">Khoa</th><th className="px-4 py-3">Công nhận</th><th className="px-4 py-3">Xếp loại</th><th className="px-4 py-3">Trạng thái</th></tr></thead>
+                <caption className="sr-only">Điểm rèn luyện của sinh viên theo từng học kỳ</caption>
+                <thead>
+                  <tr className="bg-slate-50 text-[10px] font-semibold uppercase text-slate-500">
+                    <th scope="col" className="px-4 py-3">Học kỳ</th>
+                    <th scope="col" className="px-4 py-3">Tự đánh giá</th>
+                    <th scope="col" className="px-4 py-3">Lớp</th>
+                    <th scope="col" className="px-4 py-3">Khoa</th>
+                    <th scope="col" className="px-4 py-3">Công nhận</th>
+                    <th scope="col" className="px-4 py-3">Xếp loại</th>
+                    <th scope="col" className="px-4 py-3">Trạng thái</th>
+                  </tr>
+                </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {(conductData?.items || []).map((record: any) => <tr key={record.id}><td className="px-4 py-3 font-semibold text-slate-800">{record.termCode} {record.academicYear}</td><td className="px-4 py-3 font-mono">{record.scores.self ?? "—"}</td><td className="px-4 py-3 font-mono">{record.scores.class ?? "—"}</td><td className="px-4 py-3 font-mono">{record.scores.department ?? "—"}</td><td className="px-4 py-3 font-mono font-bold">{record.scores.recognized ?? "—"}</td><td className="px-4 py-3">{record.classification || "—"}</td><td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${record.approval.code === "approved" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{record.approval.label}</span></td></tr>)}
-                  {!conductData?.items?.length && <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">Chưa có dữ liệu rèn luyện.</td></tr>}
+                  {conductItems.map((record) => (
+                    <tr key={record.id} className="hover:bg-slate-50/70">
+                      <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-800">{conductPeriodLabel(record)}</td>
+                      <td className="px-4 py-3 font-mono">{record.scores.self ?? "—"}</td>
+                      <td className="px-4 py-3 font-mono">{record.scores.class ?? "—"}</td>
+                      <td className="px-4 py-3 font-mono">{record.scores.department ?? "—"}</td>
+                      <td className="px-4 py-3 font-mono font-bold text-slate-900">{record.scores.recognized ?? "—"}</td>
+                      <td className="px-4 py-3">
+                        {record.classification ? (
+                          <span className={`whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-bold ${conductClassificationStyle(record.classification)}`}>
+                            {record.classification}
+                          </span>
+                        ) : "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-bold ${conductApprovalStyle(record.approval.code)}`}>
+                          {record.approval.label}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {!conductItems.length && (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
+                        Chưa có dữ liệu điểm rèn luyện cho sinh viên này.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

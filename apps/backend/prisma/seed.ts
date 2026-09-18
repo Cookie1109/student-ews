@@ -37,8 +37,6 @@ const permissions = [
   ["academic_warning.policy.manage", "Quản lý chính sách cảnh báo", "academic_warning_policy", "manage"],
   ["academic_warning.action.create", "Tạo hồ sơ hỗ trợ", "academic_warning_action", "create"],
   ["academic_warning.action.update", "Cập nhật hồ sơ hỗ trợ", "academic_warning_action", "update"],
-  ["activity.read", "Xem hoạt động", "activity", "read"],
-  ["activity.manage", "Quản lý hoạt động và tham gia", "activity", "manage"],
   ["user.manage", "Quản lý tài khoản", "user", "manage"],
   ["role.manage", "Quản lý vai trò và quyền", "role", "manage"],
   ["advisor_assignment.manage", "Quản lý phân công cố vấn", "advisor_assignment", "manage"],
@@ -76,7 +74,6 @@ async function seedRbac() {
     "academic_warning.read",
     "academic_warning.action.create",
     "academic_warning.action.update",
-    "activity.read",
   ]);
   await prisma.rolePermission.createMany({
     data: permissionRows
@@ -265,38 +262,6 @@ async function seedDemoData(adminId: string, advisorId: string) {
       },
     });
   }
-
-  const demoActivity = await prisma.activity.upsert({
-    where: { sourceCode: "HD-DEMO-001" },
-    update: {
-      name: "Ngày hội học thuật và kết nối sinh viên",
-      type: "Học thuật",
-      organizingUnit: "Khoa Công nghệ thông tin",
-      academicTermId: term.id,
-      conductTermId: term.id,
-    },
-    create: {
-      sourceCode: "HD-DEMO-001",
-      name: "Ngày hội học thuật và kết nối sinh viên",
-      type: "Học thuật",
-      organizingUnit: "Khoa Công nghệ thông tin",
-      academicTermId: term.id,
-      conductTermId: term.id,
-      targetAudience: "Sinh viên K44",
-      sourcePayload: { seed: true },
-    },
-  });
-  await prisma.activityParticipation.createMany({
-    data: students.slice(0, 2).map((student, index) => ({
-      studentId: student.id,
-      activityId: demoActivity.id,
-      status: index === 0 ? "completed" : "attended",
-      verifiedBy: index === 0 ? adminId : null,
-      verifiedAt: index === 0 ? new Date() : null,
-      sourcePayload: { seed: true },
-    })),
-    skipDuplicates: true,
-  });
 
   const plan = await prisma.trainingProgressPlan.upsert({
     where: {

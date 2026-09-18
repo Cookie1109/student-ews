@@ -60,8 +60,6 @@ export const ROLE_PERMISSIONS: Record<Role, string[]> = {
     "grade.read",
     "grade.import",
     "grade.export",
-    "activity.read",
-    "activity.manage",
   ],
   FACULTY_BOARD: [
     "student.read",
@@ -78,8 +76,6 @@ export const ROLE_PERMISSIONS: Record<Role, string[]> = {
     "decision.read",
     "fee_policy.read",
     "grade.read",
-    "activity.read",
-    "activity.manage",
   ],
   CLASS_ADVISOR: [
     "student.read",
@@ -90,7 +86,6 @@ export const ROLE_PERMISSIONS: Record<Role, string[]> = {
     "academic_warning.read",
     "academic_warning.action.create",
     "academic_warning.action.update",
-    "activity.read",
   ],
   FACULTY_STAFF: [
     "student.read",
@@ -104,8 +99,6 @@ export const ROLE_PERMISSIONS: Record<Role, string[]> = {
     "academic_warning.action.update",
     "decision.read",
     "grade.read",
-    "activity.read",
-    "activity.manage",
   ],
   STUDENT_AFFAIRS_ASSISTANT: [
     "student.read",
@@ -127,13 +120,10 @@ export const ROLE_PERMISSIONS: Record<Role, string[]> = {
     "academic_warning.read",
     "academic_warning.action.create",
     "academic_warning.action.update",
-    "activity.read",
-    "activity.manage",
   ],
   COMMS_ASSISTANT: [
     "student.read",
     "grade.read",
-    "activity.read",
   ],
 };
 

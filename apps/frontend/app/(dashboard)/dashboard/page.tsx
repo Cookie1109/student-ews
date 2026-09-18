@@ -157,7 +157,7 @@ export default function DashboardPage() {
   const completionMetric = summaryData?.metrics?.completionRate as DashboardMetric | undefined;
   const registrationMetric = summaryData?.metrics?.registrationRate as DashboardMetric | undefined;
   const conductMetric = summaryData?.metrics?.averageConductScore as DashboardMetric | undefined;
-  const activityMetric = summaryData?.metrics?.activityParticipationRate as DashboardMetric | undefined;
+  const graduationForecastMetric = summaryData?.metrics?.graduationForecastRate as DashboardMetric | undefined;
   const selectedClass = classes.find((item) => item.id === filters.classId);
   const metricPercent = (metric?: DashboardMetric) => metric?.status === "available" && typeof metric.value === "number"
     ? `${metric.value.toFixed(1)}%`
@@ -379,9 +379,13 @@ export default function DashboardPage() {
             <p className="mt-1 text-[11px] leading-4 text-slate-500">{summaryData.dataContext.conduct.approvedStudents} đã công nhận · {summaryData.dataContext.conduct.missingStudents} thiếu dữ liệu</p>
           </div>
           <div className="rounded-2xl border border-cyan-200/80 bg-cyan-50/50 px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-700">Hoạt động</p>
-            <p className="mt-1 text-xs font-semibold text-slate-800">{summaryData.dataContext.activities.activities} hoạt động trong kỳ</p>
-            <p className="mt-1 text-[11px] leading-4 text-slate-500">{summaryData.dataContext.activities.participatingStudents} SV tham gia · {summaryData.dataContext.activities.missingStudents} chưa có dữ liệu</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-700">Dự báo tốt nghiệp</p>
+            <p className="mt-1 text-xs font-semibold text-slate-800">
+              {summaryData.dataContext.graduationForecast.assessedStudents} sinh viên đã có kết quả
+            </p>
+            <p className="mt-1 text-[11px] leading-4 text-slate-500">
+              {summaryData.dataContext.graduationForecast.onTime} đúng hạn · {summaryData.dataContext.graduationForecast.pending} chờ kết quả
+            </p>
           </div>
         </section>
       )}
@@ -497,13 +501,15 @@ export default function DashboardPage() {
             <p className="text-[10px] text-amber-700/80 mt-1">{redCount} Đỏ · {yellowCount} Vàng</p>
           </div>
 
-          {/* Card 7: Activities */}
+          {/* Card 7: Graduation forecast */}
           <div className="bg-white border border-cyan-200/80 rounded-2xl p-4 shadow-xs bg-cyan-50/20 hover:border-cyan-400 transition-all">
-            <span className="text-[11px] font-semibold text-cyan-800 uppercase tracking-wider block">Tham gia hoạt động</span>
+            <span className="text-[11px] font-semibold text-cyan-800 uppercase tracking-wider block">Dự kiến tốt nghiệp đúng hạn</span>
             <div className="text-2xl font-bold text-cyan-700 mt-1" style={{ fontFamily: "Outfit, sans-serif" }}>
-              {metricPercent(activityMetric)}
+              {metricPercent(graduationForecastMetric)}
             </div>
-            <p className="text-[10px] text-cyan-700/80 mt-1">{metricRatio(activityMetric, "Chưa có hoạt động trong kỳ")}</p>
+            <p className="text-[10px] text-cyan-700/80 mt-1">
+              {metricRatio(graduationForecastMetric, "Chưa có kết quả dự báo")}
+            </p>
           </div>
         </div>
       </div>

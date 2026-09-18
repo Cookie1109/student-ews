@@ -73,7 +73,7 @@
 
 ---
 
-### Giai đoạn 2 — Rèn luyện, hoạt động, dashboard đa nguồn (21/09 → 11/10/2026)
+### Giai đoạn 2 — Rèn luyện, tiến độ và dashboard học vụ (21/09 → 11/10/2026)
 
 > **Mục tiêu: Luồng nhập → tính → hiển thị hoàn chỉnh; Báo cáo lần 2 (12–18/10)**
 
@@ -85,27 +85,19 @@
 - [x] **Tích hợp cảnh báo**: thêm reason code `LOW_CONDUCT_SCORE` khi điểm rèn luyện dưới ngưỡng theo dõi (cấu hình trong policy)
 - [x] **Frontend**: hiển thị điểm rèn luyện trong hồ sơ sinh viên và dashboard
 
-#### 2.2 Hoạt động (tối thiểu khả thi)
+#### 2.2 Điều chỉnh phạm vi hoạt động
 
-- [x] **Model mới**: `Activity` và `ActivityParticipation` theo đề xuất Mục 8
-  ```
-  Activity: id, sourceCode, name, type, organizingUnit, semester, 
-            targetAudience, startDate, endDate
-  ActivityParticipation: id, studentId, activityId, status (registered/
-            attended/completed), evidence, verifiedBy, verifiedAt
-  ```
-- [x] **Migration Prisma**: tạo bảng, index, FK
-- [x] **API CRUD**: GET/POST/PUT cho Activity; GET/POST cho Participation (ghi nhận, xác nhận)
-- [x] **Chống trùng**: kiểm tra trùng đăng ký/tham dự theo `studentId + activityId`
-- [x] **Frontend**: trang danh sách hoạt động, ghi nhận tham gia, bộ lọc theo kỳ/loại
+- [x] **Loại khỏi sản phẩm**: không có nguồn dữ liệu chính thức về hoạt động sinh viên tham gia.
+- [x] **Gỡ chức năng**: bỏ trang quản lý, API, quyền RBAC, dữ liệu seed và chỉ số dashboard liên quan.
+- [x] **Bảo toàn lịch sử**: chưa xóa bảng bằng migration để tránh mất dữ liệu ngoài ý muốn ở các môi trường đã triển khai.
 
 #### 2.3 Dashboard nâng cao
 
-- [x] **Tổng hợp đa nguồn**: dashboard hiển thị cảnh báo, rèn luyện, hoạt động song song
+- [x] **Tổng hợp đa nguồn**: dashboard hiển thị cảnh báo, rèn luyện, tiến độ và dự báo tốt nghiệp đúng hạn
 - [x] **Bộ lọc nâng cao**: theo kỳ, khóa, CTĐT, mức cảnh báo, trạng thái hỗ trợ
 - [x] **Báo cáo cảnh báo hiện tại**: có phân bố Đỏ/Vàng/Xanh/Xám, xu hướng cảnh báo theo kỳ, thống kê theo lớp và drill-down danh sách
 - [x] **Biểu đồ còn thiếu**: xu hướng GPA nhiều kỳ và phân bố rèn luyện; biểu đồ GPA trên dashboard hiện chưa tạo thành chuỗi lịch sử nhiều kỳ
-- [x] **Chỉ số thiếu dữ liệu đa nguồn**: báo cáo đã có số SV thiếu GPA kỳ; còn thiếu chỉ số dữ liệu rèn luyện và hoạt động
+- [x] **Chỉ số thiếu dữ liệu đa nguồn**: không hiển thị 0% khi chưa có kết quả tiến độ hoặc dự báo
 
 **Sản phẩm giao nộp:** Báo cáo lần 2, demo luồng nhập → tính → hiển thị đa nguồn
 
@@ -131,7 +123,7 @@
 
 #### 3.2 Hoàn thiện hồ sơ sinh viên
 
-- [ ] **Trang chi tiết đầy đủ**: hiện đã có học tập, điểm rèn luyện tổng hợp, quyết định, cảnh báo và nhật ký hỗ trợ; cần tách/chuẩn hóa tab Rèn luyện, thêm Hoạt động và hoàn thiện liên kết dữ liệu giữa các phần
+- [ ] **Trang chi tiết đầy đủ**: hiện đã có học tập, điểm rèn luyện tổng hợp, quyết định, cảnh báo và nhật ký hỗ trợ; cần hoàn thiện liên kết dữ liệu giữa các phần
 - [ ] **Timeline lịch sử hợp nhất**: hiện có danh sách lịch sử cảnh báo và nhật ký hỗ trợ riêng; cần ghép cảnh báo, quyết định và hành động hỗ trợ theo kỳ/thời điểm
 - [ ] **In hồ sơ**: xuất PDF hồ sơ sinh viên đầy đủ
 
@@ -141,7 +133,7 @@
 - [ ] **Edge case điểm/CTĐT**: học lại, chờ điểm, không tính GPA, tự chọn thay thế, tín chỉ ngoài tổng
 - [ ] **Edge case tiến độ**: đăng ký nhưng chưa đạt, chưa đến hạn, pending, forecast ≠ standard
 - [ ] **Edge case cảnh báo**: biên ngưỡng GPA, nhiều lý do, thiếu GPA ≠ an toàn
-- [ ] **Rèn luyện/hoạt động**: trạng thái tạm/công nhận, trùng minh chứng, kỳ hè
+- [ ] **Rèn luyện**: trạng thái tạm/công nhận và kỳ hè
 - [ ] **Hỗ trợ/quyền**: ngoài lớp/khoa, đọc/ghi/xuất, chuyển trạng thái
 - [ ] **Báo cáo**: cùng run/scope cùng kết quả, đếm SV (không đếm lý do)
 
@@ -150,11 +142,11 @@
 - [ ] **Sửa lint frontend**: xử lý lỗi lint còn tồn đọng
 - [ ] **Chuẩn hóa API response**: thống nhất envelope nếu cần, error code, pagination
 - [ ] **Audit log**: kiểm tra mọi thao tác nhạy cảm (ghi hỗ trợ, đổi quyền, xóa dữ liệu) được ghi log
-- [ ] **Smoke test mở rộng**: bổ sung test cho rèn luyện, hoạt động, xuất file
+- [ ] **Smoke test mở rộng**: bổ sung test cho rèn luyện, dự báo tốt nghiệp và xuất file
 
 #### 3.5 Tài liệu
 
-- [ ] **Cập nhật README**: hướng dẫn mới (seed, export, rèn luyện, hoạt động)
+- [ ] **Cập nhật README**: hướng dẫn mới (seed, export, rèn luyện, dự báo tốt nghiệp)
 - [ ] **Tài liệu API**: cập nhật `api-operations.json` với endpoint mới
 - [ ] **Hướng dẫn sử dụng**: tài liệu cho người dùng cuối (cán bộ quản lý, CVHT)
 - [ ] **Cập nhật ARCHITECTURE.md**: phản ánh thay đổi schema, API, nghiệp vụ mới
@@ -165,55 +157,9 @@
 
 ## 3. Chi tiết kỹ thuật
 
-### 3.1 Schema mới cần tạo (Prisma migration)
+### 3.1 Phạm vi dữ liệu hoạt động
 
-```prisma
-// Hoạt động
-model Activity {
-  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  sourceCode       String    @unique @map("source_code") @db.VarChar(64)
-  name             String    @db.VarChar(500)
-  type             String    @db.VarChar(128)     // Chính trị, XH, VH, TT, ...
-  organizingUnit   String?   @map("organizing_unit") @db.VarChar(255)
-  academicTermId   String?   @map("academic_term_id") @db.Uuid
-  conductTermId    String?   @map("conduct_term_id") @db.Uuid  // kỳ tính rèn luyện
-  startDate        DateTime? @map("start_date") @db.Date
-  endDate          DateTime? @map("end_date") @db.Date
-  targetAudience   String?   @map("target_audience") @db.VarChar(255)
-  description      String?
-  sourcePayload    Json?     @map("source_payload")
-  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  
-  participations   ActivityParticipation[]
-  @@index([academicTermId, type], map: "activities_term_type_idx")
-  @@index([conductTermId], map: "activities_conduct_term_idx")
-  @@map("activities")
-}
-
-model ActivityParticipation {
-  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  studentId      String    @map("student_id") @db.Uuid
-  activityId     String    @map("activity_id") @db.Uuid
-  status         String    @default("registered") @db.VarChar(32)
-  evidence       String?   @db.VarChar(500)
-  verifiedBy     String?   @map("verified_by") @db.Uuid
-  verifiedAt     DateTime? @map("verified_at") @db.Timestamptz(6)
-  notes          String?
-  sourcePayload  Json?     @map("source_payload")
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  activity       Activity  @relation(fields: [activityId], references: [id])
-  @@unique([studentId, activityId], map: "participation_student_activity_unique")
-  @@index([studentId, status], map: "activity_participations_student_status_idx")
-  @@index([activityId, status], map: "activity_participations_activity_status_idx")
-  @@index([verifiedBy], map: "activity_participations_verified_by_idx")
-  @@map("activity_participations")
-}
-```
-
-Đoạn trên là phác thảo trường và index, chưa phải schema copy-paste hoàn chỉnh. Migration phải tạo và kiểm tra FK cho `academicTermId`, `conductTermId`, `studentId`, `activityId`, `verifiedBy`; nếu biểu diễn bằng Prisma relation thì đồng thời bổ sung các trường relation ngược ở `AcademicTerm`, `Student` và `User`. Cần chốt `onDelete` trước khi tạo migration để không xóa dây chuyền lịch sử tham gia.
+Không triển khai nghiệp vụ tham gia hoạt động vì dự án không có nguồn dữ liệu chính thức. Các bảng đã từng tạo chỉ được giữ để bảo toàn lịch sử và không được sử dụng bởi giao diện, API hoặc dashboard.
 
 ### 3.2 Mở rộng WarningAction
 
@@ -233,17 +179,12 @@ model WarningAction {
 
 | File | Mục đích |
 | --- | --- |
-| `apps/backend/lib/services/activities.ts` | Service CRUD hoạt động và tham gia |
 | `apps/backend/lib/services/conduct.ts` | Service rèn luyện — phân loại, API riêng |
 | `apps/backend/lib/services/export.ts` | Service xuất Excel/PDF |
-| `apps/backend/app/api/v1/activities/route.ts` | API hoạt động |
-| `apps/backend/app/api/v1/activities/[id]/route.ts` | API chi tiết hoạt động |
-| `apps/backend/app/api/v1/activities/[id]/participations/route.ts` | API tham gia hoạt động |
 | `apps/backend/app/api/v1/students/[id]/conduct/route.ts` | API rèn luyện sinh viên |
 | `apps/backend/app/api/v1/academic-warnings/actions/[id]/route.ts` | API cập nhật trạng thái/phân công hồ sơ hỗ trợ |
 | `apps/backend/app/api/v1/reports/export/route.ts` | API xuất báo cáo |
 | `apps/backend/prisma/seed.ts` | Seed script |
-| `apps/frontend/app/(dashboard)/activities/page.tsx` | Trang hoạt động |
 
 ### 3.4 Thư viện cần cài thêm
 
@@ -283,7 +224,7 @@ flowchart TD
 
 | Rủi ro | Mức | Giảm thiểu |
 | --- | --- | --- |
-| Không có nguồn dữ liệu hoạt động thực | Cao | Tạo giao diện nhập thủ công + import CSV; ghi rõ phạm vi chưa hoàn thành nếu thiếu nguồn, thống nhất GVHD |
+| Không có nguồn dữ liệu hoạt động thực | Đã xử lý | Loại chức năng tham gia hoạt động khỏi phạm vi và không suy diễn từ dữ liệu thiếu |
 | Ngưỡng fallback 2,0 bị hiểu là quy định chính thức | Cao | Hiển thị đây là ngưỡng tạm, kích hoạt policy có phiên bản và lưu policy/cutoff trong báo cáo |
 | Điểm rèn luyện chưa xác nhận `statusId` | TB | Ưu tiên tiếp nhận kết quả từ đơn vị; ghi giả định rõ |
 | Thời gian eo hẹp cho xuất PDF phức tạp | TB | Ưu tiên Excel trước, PDF cơ bản; PDF nâng cao nếu còn thời gian |
@@ -294,7 +235,7 @@ flowchart TD
 
 ## 6. Tiêu chí hoàn thành đồ án
 
-- [ ] Hồ sơ sinh viên đầy đủ (học tập + rèn luyện + hoạt động + cảnh báo + hỗ trợ)
+- [ ] Hồ sơ sinh viên đầy đủ (học tập + rèn luyện + cảnh báo + hỗ trợ)
 - [ ] Dữ liệu điểm/đăng ký/quyết định nhập và truy xuất được
 - [ ] Kế hoạch và tiến độ CTĐT đánh giá chính xác
 - [ ] Cảnh báo theo quy tắc với đầy đủ nguyên nhân, snapshot, truy vết nguồn
@@ -316,4 +257,4 @@ flowchart TD
 > Mức cảnh báo nội bộ (Xanh/Vàng/Đỏ) là chỉ số theo dõi, **không** tương đương mức kỷ luật chính thức của trường. Hệ thống hỗ trợ ra quyết định, không thay quyết định nhà trường.
 
 > [!NOTE]
-> Kế hoạch này cần được điều chỉnh theo phản hồi GVHD và tình hình dữ liệu thực tế. Nếu không có nguồn hoạt động từ đơn vị, ghi rõ yêu cầu chưa hoàn thành hoặc điều chỉnh phạm vi đã thống nhất.
+> Kế hoạch đã loại chức năng tham gia hoạt động do không có nguồn dữ liệu chính thức. Mọi thay đổi phạm vi tiếp theo cần được thống nhất với GVHD.

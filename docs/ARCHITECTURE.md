@@ -1,9 +1,9 @@
 # Kiến trúc hệ thống theo dõi và cảnh báo sớm sinh viên
 
 **Dự án:** SEWS — Student Early Warning System, Khoa Công nghệ Thông tin, Trường Đại học Đà Lạt.  
-**Phiên bản:** 4.1 — 10/09/2026.
+**Phiên bản:** 4.2 — 16/09/2026.
 
-SEWS tập trung dữ liệu sinh viên để hỗ trợ cán bộ quản lý và cố vấn học tập phát hiện trường hợp cần theo dõi, tìm hiểu nguyên nhân và ghi nhận hỗ trợ. Kiến trúc gồm nền tảng học vụ đang triển khai, phần rèn luyện và hoạt động cần hoàn thiện theo đề cương đồ án, cùng hướng nghiên cứu dự báo nguy cơ học vụ bằng học máy.
+SEWS tập trung dữ liệu sinh viên để hỗ trợ cán bộ quản lý và cố vấn học tập phát hiện trường hợp cần theo dõi, tìm hiểu nguyên nhân và ghi nhận hỗ trợ. Kiến trúc gồm nền tảng học vụ, phần rèn luyện và hướng nghiên cứu dự báo nguy cơ học vụ bằng học máy. Chức năng tham gia hoạt động không nằm trong phạm vi sản phẩm vì chưa có nguồn dữ liệu chính thức.
 
 Tài liệu phân biệt **hiện trạng mã nguồn**, **yêu cầu từ tài liệu nguồn** và **thiết kế đề xuất**. Phần ghi “đề xuất” chưa phải chức năng đã có. Hệ thống hỗ trợ ra quyết định; quyết định cảnh báo học vụ, kỷ luật và công nhận tốt nghiệp thuộc thẩm quyền nhà trường.
 
@@ -43,7 +43,7 @@ Quyết định cảnh báo cũ có thể là dấu hiệu cần theo dõi, như
 | Đăng ký, tiến độ, hoàn thành CTĐT | Có kế hoạch phiên bản và đợt tính | Làm rõ thời điểm, ngoại lệ, điều kiện tốt nghiệp |
 | Cảnh báo học vụ | Có bộ máy theo run với chính sách GPA và 5 mã nguyên nhân; báo cáo live hiện phân loại theo GPA/quyết định | Nhất quán phạm vi, phiên bản, ngưỡng và giải thích giữa hai chế độ |
 | Rèn luyện | Có `StudentConductRecord`, điểm trong `StudentTermSummary`, API đọc tổng hợp | Xác định điểm công nhận và tiêu chí theo dõi |
-| Hoạt động | Chưa có model nghiệp vụ riêng | Tiếp nhận tham gia, xác nhận và độ đầy đủ nguồn |
+| Hoạt động | Không có nguồn dữ liệu chính thức; không triển khai giao diện/API | Ngoài phạm vi phiên bản hiện tại |
 | Hỗ trợ | Có `WarningAction`, API đọc/tạo | Hồ sơ, người phụ trách, chuyển trạng thái có kiểm soát |
 | Học máy | Chưa có pipeline, mô hình, kho dự báo | Nghiên cứu và tích hợp theo S2 |
 | Báo cáo, nhập/xuất | Báo cáo cảnh báo live chọn kỳ đủ độ phủ; giao diện xuất CSV; một số API `export` trả JSON | Báo cáo đa nguồn và file XLSX/PDF đúng định dạng theo S1 |
@@ -61,7 +61,6 @@ S1/S2 xác định cán bộ quản lý và cố vấn học tập là nhóm s�
 | GVCN/CVHT | Rà soát hồ sơ, tư vấn, ghi nhật ký | Lớp được phân công |
 | Giáo vụ/chuyên viên | Chuẩn hóa hồ sơ, CTĐT, kết quả, báo cáo | Khoa/dữ liệu được giao |
 | Trợ lý CTSV/cán bộ CTSV | Đối chiếu rèn luyện, quyết định, phối hợp hỗ trợ | Theo phân công đơn vị |
-| Cán bộ Đoàn–Hội | Cung cấp và xác nhận hoạt động | Hoạt động liên quan; vai trò mở rộng |
 | Quản trị | Tài khoản, quyền, cấu hình, nguồn dữ liệu | Quyền quản trị được cấp |
 | Nhóm nghiên cứu | Chuẩn bị dữ liệu, huấn luyện, đánh giá | Dữ liệu nghiên cứu được phép sử dụng |
 
@@ -268,7 +267,7 @@ Các việc cần chuẩn hóa:
 - Ghi rõ báo cáo live và cảnh báo theo run là hai chế độ khác nhau; nếu hợp nhất thì phải dùng cùng kỳ, scope, policy và cutoff.
 - Khi dashboard cho phép lọc kỳ, truyền kỳ đó vào nguồn cảnh báo hoặc hiển thị riêng kỳ thực tế của từng khối số liệu.
 
-## 8. Rèn luyện và hoạt động
+## 8. Rèn luyện và dữ liệu hoạt động ngoài phạm vi
 
 S5 dùng thang 100 với năm mặt: học tập 20; nội quy 25; hoạt động chính trị/xã hội/văn hóa/thể thao 20; ý thức công dân/cộng đồng 25; cán bộ/tổ chức/thành tích đặc biệt 10. Điều 6 có cộng điểm; không thể tái dựng điểm chính thức chỉ từ số lượt hoạt động.
 
@@ -278,12 +277,9 @@ S5 dùng thang 100 với năm mặt: học tập 20; nội quy 25; hoạt độn
 
 `StudentConductRecord` có `studentScore`, `classScore`, `departmentScore`, `lastScore`, `statusId`, payload nguồn. Chưa có ánh xạ được xác nhận từ `statusId` sang phê duyệt; không mặc định `lastScore` đã được công nhận. Ưu tiên tiếp nhận kết quả từ đơn vị phụ trách. Nếu xây quy trình tự đánh giá đầy đủ, cần tiêu chí phiên bản, điểm thành phần, minh chứng, phê duyệt, khiếu nại và quyết định; đây là thiết kế mới.
 
-| Thực thể đề xuất | Dữ liệu tối thiểu |
-| --- | --- |
-| `Activity` | Mã nguồn, tên, loại, đơn vị, thời gian, kỳ phát sinh/kỳ rèn luyện, đối tượng áp dụng |
-| `ActivityParticipation` | Sinh viên, hoạt động, đăng ký/tham dự/hoàn thành, minh chứng, người/trạng thái xác nhận, thời điểm nguồn |
+Không có nguồn dữ liệu hoạt động đủ tin cậy để xác định sinh viên có tham gia hay không. Vì vậy hệ thống không hiển thị tỷ lệ tham gia, không cung cấp API nhập thủ công và không dùng dữ liệu này trong cảnh báo. Các bảng `Activity` và `ActivityParticipation` đã từng được tạo được giữ lại để bảo toàn lịch sử, nhưng không còn được giao diện hoặc dịch vụ nghiệp vụ sử dụng.
 
-Chỉ đếm tham gia đã xác nhận, chống trùng. Không có bản ghi chưa đủ để kết luận không tham gia: phải biết nguồn đầy đủ chưa, sinh viên có thuộc đối tượng hoặc được miễn không. Ngưỡng rèn luyện thấp, giảm điểm, ít tham gia cần thống nhất đơn vị sử dụng. Không tự cộng trọng số học tập–rèn luyện–hoạt động; cần tránh tính trùng thông tin hoạt động đã nằm trong điểm rèn luyện.
+Không tự cộng trọng số hoạt động vào điểm rèn luyện vì có nguy cơ tính trùng thông tin đã nằm trong kết quả rèn luyện chính thức.
 
 ## 9. Kiến trúc học máy đề xuất — hoãn sau báo cáo đồ án
 
